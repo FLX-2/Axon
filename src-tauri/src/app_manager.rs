@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
-use rayon::prelude::*;
 use std::collections::HashSet;
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use windows::Win32::System::Com::{IPersistFile, CoCreateInstance, CLSCTX_INPROC_SERVER, STGM_READ};

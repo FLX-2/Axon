@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, PhysicalSize, Size};
+use tauri::{Manager, PhysicalSize, Size, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
 use window_shadows::set_shadow;
 use window_vibrancy::apply_blur;
 use winreg::enums::*;
@@ -237,7 +237,7 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
                         // Try to get favicon using the domain's favicon.ico
                         if url.starts_with("http") {
                             if let Ok(url) = url::Url::parse(url) {
-                                if let Some(domain) = url.host_str() {
+                                if let Some(_domain) = url.host_str() {
                                     // Use browser icon as fallback
                                     let browsers = [
                                         "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -619,9 +619,47 @@ fn main() {
             }
         }
         
-        log_error("Starting application without system tray...");
+        // Create system tray menu with proper CustomMenuItem objects
+        let show = tauri::CustomMenuItem::new("show".to_string(), "Show");
+        let quit = tauri::CustomMenuItem::new("quit".to_string(), "Quit");
+        
+        let tray_menu = SystemTrayMenu::new()
+            .add_item(show)
+            .add_native_item(SystemTrayMenuItem::Separator)
+            .add_item(quit);
+        
+        let system_tray = SystemTray::new().with_menu(tray_menu);
+        
+        log_error("Starting application with system tray...");
         
         let app = tauri::Builder::default()
+            .system_tray(system_tray)
+            .on_system_tray_event(|app, event| match event {
+                SystemTrayEvent::MenuItemClick { id, .. } => {
+                    match id.as_str() {
+                        "quit" => {
+                            log_error("Quit selected from system tray - exiting application");
+                            std::process::exit(0);
+                        }
+                        "show" => {
+                            let window = app.get_window("main").unwrap();
+                            window.show().unwrap();
+                            window.set_focus().unwrap();
+                        }
+                        _ => {}
+                    }
+                }
+                SystemTrayEvent::LeftClick { .. } => {
+                    let window = app.get_window("main").unwrap();
+                    if window.is_visible().unwrap() {
+                        window.hide().unwrap();
+                    } else {
+                        window.show().unwrap();
+                        window.set_focus().unwrap();
+                    }
+                }
+                _ => {}
+            })
             .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
                 app.get_window("main").unwrap().show().unwrap();
                 app.get_window("main").unwrap().set_focus().unwrap();
@@ -682,13 +720,16 @@ fn main() {
                 log_error("Setup completed successfully");
                 Ok(())
             })
-            // Handle window close events to completely exit the application
+            // Handle window close events - hide window instead of exiting
             .on_window_event(|event| {
-                if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
-                    log_error("Window close requested - exiting application");
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
+                    log_error("Window close requested - hiding window to system tray");
                     
-                    // Force a complete exit to ensure no background processes remain
-                    std::process::exit(0);
+                    // Prevent the default close behavior
+                    api.prevent_close();
+                    
+                    // Hide the window instead of closing it
+                    event.window().hide().unwrap();
                 }
             })
             .invoke_handler(tauri::generate_handler![

@@ -34,18 +34,19 @@ const Toggle: React.FC<{
 );
 
 export const Settings: React.FC = () => {
+  const settings = useSettingsStore();
   const {
     launchAtStartup,
-    startMinimized,
+    minimizeToTray,
     themeMode,
     setLaunchAtStartup,
-    setStartMinimized,
+    setMinimizeToTray,
     setThemeMode,
     colors,
     setAccentColor,
     resetToSystemAccentColor,
     isCustomAccentColor,
-  } = useSettingsStore();
+  } = settings;
 
   const activeColors = themeMode === 'dark' ? colors.dark : colors.light;
 
@@ -99,9 +100,9 @@ export const Settings: React.FC = () => {
               label="Launch at startup"
             />
             <Toggle
-              checked={startMinimized}
-              onChange={setStartMinimized}
-              label="Start minimized"
+              checked={minimizeToTray}
+              onChange={setMinimizeToTray}
+              label="Minimize to tray"
             />
           </div>
         </div>

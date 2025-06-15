@@ -174,14 +174,17 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     return a.name.localeCompare(b.name);
   });
 
-  const recentApps = selectedCategory === null ? filteredApps
-    .filter(app => app.lastAccessed)
-    .sort((a, b) => {
-      const dateA = new Date(a.lastAccessed || '').getTime();
-      const dateB = new Date(b.lastAccessed || '').getTime();
-      return dateB - dateA;
-    })
-    .slice(0, 5) : [];
+  // Get recent apps by checking lastAccessed timestamps
+  const recentApps = selectedCategory === null 
+    ? filteredApps
+        .filter(app => app.lastAccessed)
+        .sort((a, b) => {
+          const dateA = new Date(a.lastAccessed || '').getTime();
+          const dateB = new Date(b.lastAccessed || '').getTime();
+          return dateB - dateA;
+        })
+        .slice(0, 5)
+    : [];
 
   return (
     <div className="p-4">

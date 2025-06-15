@@ -1,16 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { AppInfo } from '../types/app';
 import { loadStartMenuApps, getAppIcon } from '../lib/system';
-import { invoke } from '@tauri-apps/api/tauri';
-
-interface AppSettings {
-  custom_icons: Record<string, string>;
-  moved_apps: Record<string, string>;
-  pinned_apps: string[];
-  recent_apps: string[];
-  is_grid_view: boolean;
-  categories: Record<string, string>;
-}
 
 interface AppState {
   apps: AppInfo[];
@@ -20,7 +11,7 @@ interface AppState {
   customIcons: Record<string, string>;
   movedApps: Record<string, string>;
   pinnedApps: string[];
-  recentApps: string[];
+  lastAccessed: Record<string, string>;
   categories: Record<string, string>;
   setApps: (apps: AppInfo[]) => void;
   setSearchTerm: (term: string) => void;
@@ -32,7 +23,6 @@ interface AppState {
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => void;
   moveApp: (path: string, newPath: string) => void;
-  saveSettings: () => Promise<void>;
 }
 
 const initialState = {
@@ -43,43 +33,20 @@ const initialState = {
   customIcons: {},
   movedApps: {},
   pinnedApps: [],
-  recentApps: [],
+  lastAccessed: {},
   categories: {},
 };
 
-export const useAppStore = create<AppState>()((set, get) => ({
-  ...initialState,
-
-  saveSettings: async () => {
-    const state = get();
-    console.log('Saving settings:', {
-      custom_icons: state.customIcons,
-      moved_apps: state.movedApps,
-      pinned_apps: state.pinnedApps,
-      recent_apps: state.recentApps,
-      is_grid_view: state.isGridView,
-      categories: state.categories,
-    });
-    
-    await invoke('save_app_settings', {
-      settings: {
-        custom_icons: state.customIcons,
-        moved_apps: state.movedApps,
-        pinned_apps: state.pinnedApps,
-        recent_apps: state.recentApps,
-        is_grid_view: state.isGridView,
-        categories: state.categories,
-      }
-    });
-  },
-
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
   setApps: (apps) => set({ apps }),
   
   setSearchTerm: (term) => set({ searchTerm: term }),
   
   toggleView: () => {
     set((state) => ({ isGridView: !state.isGridView }));
-    get().saveSettings();
   },
 
   togglePinned: (path) => {
@@ -98,27 +65,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
         )
       };
     });
-    get().saveSettings();
   },
 
   updateLastAccessed: (path, timestamp) => {
     set((state) => {
-      // Keep only the last 20 recent apps
-      const newRecentApps = [
-        path,
-        ...state.recentApps.filter(p => p !== path)
-      ].slice(0, 20);
-
       return {
-        recentApps: newRecentApps,
-        apps: state.apps.map(app =>
-          app.path === path
-            ? { ...app, lastAccessed: timestamp }
+        lastAccessed: {
+          ...state.lastAccessed,
+          [path]: timestamp
+        },
+        apps: state.apps.map(app => 
+          app.path === path 
+            ? { ...app, lastAccessed: timestamp } 
             : app
         )
       };
     });
-    get().saveSettings();
   },
 
   updateCategory: (path, category) => {
@@ -139,46 +101,28 @@ export const useAppStore = create<AppState>()((set, get) => ({
         )
       };
     });
-    get().saveSettings();
   },
 
   loadApps: async () => {
     set({ isLoading: true });
     try {
-      // Load saved settings first
-      const settings = await invoke<AppSettings>('load_app_settings');
-      console.log('Loaded settings:', settings);
-      
-      set({ 
-        customIcons: settings.custom_icons || {},
-        movedApps: settings.moved_apps || {},
-        pinnedApps: settings.pinned_apps || [],
-        recentApps: settings.recent_apps || [],
-        isGridView: settings.is_grid_view,
-        categories: settings.categories || {},
-      });
-
       const apps = await loadStartMenuApps() as AppInfo[];
       const state = get();
       
       // Apply all saved settings
       const updatedApps = apps.map(newApp => {
-        const movedPath = state.movedApps[newApp.path];
-        const category = state.categories[newApp.path];
-        const isPinned = state.pinnedApps.includes(movedPath || newApp.path);
-        const lastAccessed = state.recentApps.includes(movedPath || newApp.path) 
-          ? new Date().toISOString()
-          : undefined;
+        const movedPath = state.movedApps[newApp.path] || newApp.path;
+        const category = state.categories[newApp.path] || newApp.category;
+        const isPinned = state.pinnedApps.includes(movedPath);
+        const lastAccessed = state.lastAccessed[newApp.path];
 
-        const appWithSettings = {
+        return {
           ...newApp,
-          path: movedPath || newApp.path,
-          category: category || newApp.category,
+          path: movedPath,
+          category,
           isPinned,
           lastAccessed,
         };
-
-        return appWithSettings;
       });
       
       // Load icons in batches of 5
@@ -248,7 +192,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         )
       };
     });
-    get().saveSettings();
   },
 
   moveApp: (path: string, newPath: string) => {
@@ -265,6 +208,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
         )
       };
     });
-    get().saveSettings();
   }
-}));
+    }),
+    {
+      name: 'app-hub-app-data',
+      partialize: (state) => ({
+        customIcons: state.customIcons,
+        movedApps: state.movedApps,
+        pinnedApps: state.pinnedApps,
+        lastAccessed: state.lastAccessed,
+        isGridView: state.isGridView,
+        categories: state.categories
+      }),
+      merge: (persistedState: any, currentState) => ({
+        ...currentState,
+        ...persistedState,
+      }),
+    }
+  )
+);

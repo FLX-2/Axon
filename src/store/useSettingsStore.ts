@@ -40,11 +40,11 @@ interface SettingsState {
     dark: ThemeColors;
   };
   launchAtStartup: boolean;
-  startMinimized: boolean;
+  minimizeToTray: boolean;
   isCustomAccentColor: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   setLaunchAtStartup: (launch: boolean) => void;
-  setStartMinimized: (minimized: boolean) => void;
+  setMinimizeToTray: (value: boolean) => void;
   isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
@@ -115,10 +115,10 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       themeMode: 'system',
       colors: defaultColors,
-      launchAtStartup: false,
-      startMinimized: false,
-      isCustomAccentColor: false,
-      isDarkMode: false,
+  launchAtStartup: false,
+  minimizeToTray: true,
+  isCustomAccentColor: false,
+  isDarkMode: false,
       setThemeMode: (mode) => set({ themeMode: mode }),
       setLaunchAtStartup: async (launch) => {
         try {
@@ -128,7 +128,7 @@ export const useSettingsStore = create<SettingsState>()(
           console.error('Failed to set launch at startup:', error);
         }
       },
-      setStartMinimized: (minimized) => set({ startMinimized: minimized }),
+  setMinimizeToTray: (value) => set({ minimizeToTray: value }),
       setAccentColor: (color: string) => set((state) => ({
         colors: {
           light: { ...state.colors.light, accent: color },
@@ -170,11 +170,11 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'app-hub-settings',
-      partialize: (state) => ({
+    partialize: (state) => ({
         themeMode: state.themeMode,
         colors: state.colors,
         launchAtStartup: state.launchAtStartup,
-        startMinimized: state.startMinimized,
+        minimizeToTray: state.minimizeToTray,
         isCustomAccentColor: state.isCustomAccentColor
       }),
       merge: (persistedState: any, currentState) => ({

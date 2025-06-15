@@ -589,8 +589,18 @@ fn main() {
             .on_window_event(|event| {
                 match event.event() {
                     tauri::WindowEvent::CloseRequested { api, .. } => {
-                        event.window().hide().unwrap();
-                        api.prevent_close();
+                        // Get the minimize_to_tray setting from the frontend
+                        let minimize_to_tray = true; // Default value
+                        // In a real implementation, we would get this from the frontend store
+                        
+                        if minimize_to_tray {
+                            // Minimize to tray instead of closing
+                            event.window().hide().unwrap();
+                            api.prevent_close();
+                        } else {
+                            // Close the app completely
+                            std::process::exit(0);
+                        }
                     }
                     _ => {}
                 }

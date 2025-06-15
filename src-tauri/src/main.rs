@@ -620,11 +620,12 @@ fn main() {
         }
         
         // Create system tray menu with proper CustomMenuItem objects
-        let show = tauri::CustomMenuItem::new("show".to_string(), "Show");
+        // The show/hide item will start as "Show" and toggle based on window visibility
+        let toggle_visibility = tauri::CustomMenuItem::new("toggle_visibility".to_string(), "Show/Hide");
         let quit = tauri::CustomMenuItem::new("quit".to_string(), "Quit");
         
         let tray_menu = SystemTrayMenu::new()
-            .add_item(show)
+            .add_item(toggle_visibility)
             .add_native_item(SystemTrayMenuItem::Separator)
             .add_item(quit);
         
@@ -641,19 +642,29 @@ fn main() {
                             log_error("Quit selected from system tray - exiting application");
                             std::process::exit(0);
                         }
-                        "show" => {
+                        "toggle_visibility" => {
                             let window = app.get_window("main").unwrap();
-                            window.show().unwrap();
-                            window.set_focus().unwrap();
+                            // Toggle the window visibility
+                            if window.is_visible().unwrap() {
+                                log_error("Hiding window from system tray menu");
+                                window.hide().unwrap();
+                            } else {
+                                log_error("Showing window from system tray menu");
+                                window.show().unwrap();
+                                window.set_focus().unwrap();
+                            }
                         }
                         _ => {}
                     }
                 }
                 SystemTrayEvent::LeftClick { .. } => {
+                    // Left click on the system tray icon also toggles visibility
                     let window = app.get_window("main").unwrap();
                     if window.is_visible().unwrap() {
+                        log_error("Hiding window from system tray icon click");
                         window.hide().unwrap();
                     } else {
+                        log_error("Showing window from system tray icon click");
                         window.show().unwrap();
                         window.set_focus().unwrap();
                     }

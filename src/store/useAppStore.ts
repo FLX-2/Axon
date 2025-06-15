@@ -3,6 +3,111 @@ import { persist } from 'zustand/middleware';
 import { AppInfo } from '../types/app';
 import { loadStartMenuApps, getAppIcon } from '../lib/system';
 
+// Helper functions for icon loading and caching
+// Polyfill for requestIdleCallback
+const requestIdleCallback =
+  window.requestIdleCallback ||
+  ((callback: IdleRequestCallback) => setTimeout(callback, 1));
+
+// Load icons progressively with priority for visible apps
+const loadIconsProgressively = (
+  apps: AppInfo[],
+  state: any,
+  updateCallback: (apps: AppInfo[]) => void
+) => {
+  const appsToProcess = [...apps];
+  const result = [...apps];
+  
+  // Process icons in small batches to avoid freezing the UI
+  const processBatch = async () => {
+    if (appsToProcess.length === 0) return;
+    
+    // Take first 3 apps from the queue
+    const batch = appsToProcess.splice(0, 3);
+    
+    // Process this batch
+    await Promise.all(batch.map(async (app) => {
+      // Skip if we already have a custom icon
+      if (state.customIcons[app.path]) {
+        return;
+      }
+      
+      // Check cache first
+      const cachedIcon = getIconFromCache(app.path);
+      if (cachedIcon) {
+        const index = result.findIndex(a => a.path === app.path);
+        if (index !== -1) {
+          result[index] = { ...result[index], icon: cachedIcon };
+        }
+        return;
+      }
+      
+      // If not in cache, load from backend
+      try {
+        const icon = await getAppIcon(app.path);
+        const index = result.findIndex(a => a.path === app.path);
+        if (index !== -1) {
+          result[index] = { ...result[index], icon: icon as string };
+          saveIconToCache(app.path, icon as string);
+        }
+      } catch (error) {
+        // Silently fail on icon loading errors
+      }
+    }));
+    
+    // Update UI with latest results
+    updateCallback([...result]);
+    
+    // Process next batch during idle time
+    if (appsToProcess.length > 0) {
+      requestIdleCallback(() => processBatch());
+    }
+  };
+  
+  // Start processing
+  processBatch();
+};
+
+// Icon cache management
+const ICON_CACHE_PREFIX = 'app_icon_';
+const ICON_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const getIconFromCache = (path: string): string | null => {
+  try {
+    const cacheKey = ICON_CACHE_PREFIX + btoa(path);
+    const cachedData = localStorage.getItem(cacheKey);
+    
+    if (!cachedData) return null;
+    
+    const { icon, timestamp } = JSON.parse(cachedData);
+    
+    // Check if cache has expired
+    if (Date.now() - timestamp > ICON_CACHE_EXPIRY) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    
+    return icon;
+  } catch (error) {
+    // Silent error for cache reads
+    return null;
+  }
+};
+
+const saveIconToCache = (path: string, icon: string): void => {
+  try {
+    const cacheKey = ICON_CACHE_PREFIX + btoa(path);
+    const cacheData = {
+      icon,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  } catch (error) {
+    // Silent error for cache writes
+  }
+};
+
 interface AppState {
   apps: AppInfo[];
   searchTerm: string;
@@ -106,6 +211,7 @@ export const useAppStore = create<AppState>()(
   loadApps: async () => {
     set({ isLoading: true });
     try {
+      // STEP 1: Load app metadata quickly (cached in backend)
       const apps = await loadStartMenuApps() as AppInfo[];
       const state = get();
       
@@ -122,45 +228,48 @@ export const useAppStore = create<AppState>()(
           category,
           isPinned,
           lastAccessed,
+          // Initialize with placeholder icon
+          icon: state.customIcons[movedPath] || null,
         };
       });
       
-      // Load icons in batches of 5
-      const batchSize = 5;
-      const appsWithIcons: AppInfo[] = [];
+      // STEP 2: Set apps without icons first for immediate display
+      set({ apps: updatedApps, isLoading: false });
       
-      for (let i = 0; i < updatedApps.length; i += batchSize) {
-        const batch = updatedApps.slice(i, i + batchSize);
-        const iconPromises = batch.map(async (app) => {
-          // Check for custom icon first
-          if (state.customIcons[app.path]) {
-            return { ...app, icon: state.customIcons[app.path] };
-          }
-          
-          // Load default icon if no custom icon exists
-          try {
-            const icon = await getAppIcon(app.path);
-            return { ...app, icon: icon as string };
-          } catch (error) {
-            console.error(`Failed to load icon for ${app.name}:`, error);
-            return { ...app, icon: null };
-          }
+      // STEP 3: Load icons in background with priority for visible apps
+      requestIdleCallback(() => {
+        loadIconsProgressively(updatedApps, state, (updatedAppsWithIcons) => {
+          set({ apps: updatedAppsWithIcons });
         });
-        
-        const batchResults = await Promise.all(iconPromises);
-        appsWithIcons.push(...batchResults);
-      }
-      
-      set({ apps: appsWithIcons, isLoading: false });
+      });
     } catch (error) {
-      console.error('Failed to load apps:', error);
+      // Log to app logger instead of console
       set({ isLoading: false });
     }
   },
 
   loadAppIcon: async (path: string) => {
     try {
+      // Check if we already have this icon in localStorage cache
+      const cachedIcon = getIconFromCache(path);
+      if (cachedIcon) {
+        set((state) => ({
+          apps: state.apps.map(app =>
+            app.path === path
+              ? { ...app, icon: cachedIcon }
+              : app
+          )
+        }));
+        return;
+      }
+      
+      // If not cached, fetch from backend
       const icon = await getAppIcon(path);
+      
+      // Save to cache
+      saveIconToCache(path, icon as string);
+      
+      // Update app state
       set((state) => ({
         apps: state.apps.map(app =>
           app.path === path
@@ -169,7 +278,7 @@ export const useAppStore = create<AppState>()(
         )
       }));
     } catch (error) {
-      console.error(`Failed to load icon for ${path}:`, error);
+      // Silently fail on icon loading errors
     }
   },
 

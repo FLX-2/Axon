@@ -53,6 +53,37 @@ textarea,
   background-clip: padding-box;
 }
 
+/* Black theme scrollbar */
+.theme-black ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-black ::-webkit-scrollbar-track {
+  background: var(--color-surfacePrimary);
+}
+
+.theme-black ::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar);
+  border-radius: 4px;
+  border: none;
+}
+
+.theme-black ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbarHover);
+}
+
+/* Black theme accent color fix */
+.theme-black .text-accent {
+  color: var(--color-accent);
+}
+
+/* Remove hover glows only in black theme */
+.theme-black button:hover,
+.theme-black [role="button"]:hover {
+  box-shadow: none;
+}
+
 /* Add these styles */
 .app-icon {
   image-rendering: -webkit-optimize-contrast;

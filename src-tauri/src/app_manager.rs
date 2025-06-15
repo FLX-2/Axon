@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
@@ -8,8 +8,23 @@ use windows::Win32::System::Com::{IPersistFile, CoCreateInstance, CLSCTX_INPROC_
 use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use notify::Watcher;
 use windows::core::{PCWSTR, ComInterface};
+use std::time::{Duration, SystemTime};
+use std::fs;
+use std::io::{Read, Write};
+use std::fs::OpenOptions;
 
-#[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq)]
+// Internal logging function
+fn log_error(error: &str) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("app.log")
+    {
+        let _ = writeln!(file, "[APP_MANAGER] {}: {}", chrono::Local::now(), error);
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct AppInfo {
     pub name: String,
     pub path: String,
@@ -17,15 +32,81 @@ pub struct AppInfo {
     pub icon: Option<String>,
 }
 
+// Cache structure to store app data with timestamp
+#[derive(Debug, Serialize, Deserialize)]
+struct AppCache {
+    apps: Vec<AppInfo>,
+    timestamp: u64,  // Unix timestamp for expiration check
+}
+
 pub struct AppManager {
     apps: Arc<Mutex<HashSet<AppInfo>>>,
+    cache_path: PathBuf,
+    cache_ttl: Duration,  // Time-to-live for cache
 }
 
 impl AppManager {
     pub fn new() -> Self {
+        // Get cache directory
+        let cache_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
+            .unwrap_or_else(|| PathBuf::from("."));
+        
+        // Create cache directory if it doesn't exist
+        if !cache_dir.exists() {
+            let _ = fs::create_dir_all(&cache_dir);
+        }
+        
+        let cache_path = cache_dir.join("apps_cache.json");
+        
         Self {
             apps: Arc::new(Mutex::new(HashSet::new())),
+            cache_path,
+            cache_ttl: Duration::from_secs(3600),  // 1 hour cache TTL
         }
+    }
+    
+    // Read from cache file
+    fn read_cache(&self) -> Option<AppCache> {
+        match fs::File::open(&self.cache_path) {
+            Ok(mut file) => {
+                let mut contents = String::new();
+                if file.read_to_string(&mut contents).is_ok() {
+                    if let Ok(cache) = serde_json::from_str::<AppCache>(&contents) {
+                        return Some(cache);
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+        None
+    }
+    
+    // Write to cache file
+    fn write_cache(&self, apps: &Vec<AppInfo>) {
+        let cache = AppCache {
+            apps: apps.clone(),
+            timestamp: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        };
+        
+        if let Ok(contents) = serde_json::to_string(&cache) {
+            if let Ok(mut file) = fs::File::create(&self.cache_path) {
+                let _ = file.write_all(contents.as_bytes());
+            }
+        }
+    }
+    
+    // Check if cache is valid
+    fn is_cache_valid(&self, cache: &AppCache) -> bool {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        
+        // Cache is valid if less than TTL has elapsed
+        now - cache.timestamp < self.cache_ttl.as_secs()
     }
 
     pub fn start_file_watcher(&self) {
@@ -37,7 +118,7 @@ impl AppManager {
             
             let mut watcher = notify::recommended_watcher(move |res| {
                 if let Ok(event) = res {
-                    tx.send(event).unwrap_or_else(|e| eprintln!("Failed to send event: {}", e));
+                    let _ = tx.send(event);
                 }
             }).unwrap();
 
@@ -67,6 +148,17 @@ impl AppManager {
     }
 
     pub fn scan_shortcuts() -> Result<Vec<AppInfo>, String> {
+        // Create a temporary instance to access cache
+        let manager = Self::new();
+        
+        // Check cache first
+        if let Some(cache) = manager.read_cache() {
+            if manager.is_cache_valid(&cache) {
+                return Ok(cache.apps);
+            }
+        }
+        
+        // Cache invalid or missing, perform fresh scan
         let paths = vec![
             std::env::var("ProgramData").map(|p| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs", p)),
             std::env::var("APPDATA").map(|p| format!("{}\\Microsoft\\Windows\\Start Menu\\Programs", p)),
@@ -76,26 +168,64 @@ impl AppManager {
             .filter_map(Result::ok)
             .collect();
 
-        let apps: HashSet<AppInfo> = valid_paths.par_iter()
-            .flat_map(|path| Self::scan_directory(&PathBuf::from(path)).unwrap_or_default())
-            .collect();
+        log_error(&format!("Scanning {} valid Start Menu paths", valid_paths.len()));
+        
+        // Process paths sequentially for more reliable results
+        let mut all_apps = HashSet::new();
+        for path in &valid_paths {
+            log_error(&format!("Scanning path: {}", path));
+            if let Ok(path_apps) = Self::scan_directory(&PathBuf::from(path)) {
+                log_error(&format!("Found {} apps in {}", path_apps.len(), path));
+                all_apps.extend(path_apps);
+            }
+        }
+        
+        // Convert to vector
+        let apps = all_apps;
+        log_error(&format!("Total unique apps found: {}", apps.len()));
 
-        Ok(apps.into_iter().collect())
+        let result: Vec<AppInfo> = apps.into_iter().collect();
+        
+        // Update cache with new results
+        manager.write_cache(&result);
+        
+        Ok(result)
     }
 
     fn scan_directory(dir: &PathBuf) -> Result<Vec<AppInfo>, String> {
         let mut apps = Vec::new();
+        
+        // Log directory being scanned
+        log_error(&format!("Scanning directory: {}", dir.display()));
+        
+        // No file count limiter - we want to scan all files
         
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 
                 if path.is_dir() {
-                    if let Ok(mut subdir_apps) = Self::scan_directory(&path) {
-                        apps.append(&mut subdir_apps);
+                    // Skip only Windows system directories by exact match
+                    let skip_dirs = [
+                        "windows", "system32", "systemapps", "syswow64",
+                        "winsxs", "assembly", "microsoft.net"
+                    ];
+                    
+                    let dir_name = path.file_name()
+                        .map(|name| name.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    
+                    if !skip_dirs.iter().any(|&skip| dir_name == skip) {
+                        // Recursively scan subdirectory
+                        if let Ok(mut subdir_apps) = Self::scan_directory(&path) {
+                            apps.append(&mut subdir_apps);
+                        }
                     }
                 } else if let Some(ext) = path.extension() {
-                    if ext == "lnk" {
+                    let ext_str = ext.to_string_lossy().to_lowercase();
+                    // Process both .lnk and .url files
+                    if ext_str == "lnk" {
+                        // Handle .lnk files using shell link API
                         unsafe {
                             let shell_link: IShellLinkW = CoCreateInstance(
                                 &ShellLink,
@@ -138,6 +268,38 @@ impl AppManager {
                                 category: Self::determine_category(&PathBuf::from(&target_path)),
                                 icon: None,
                             });
+                        }
+                    } else if ext_str == "url" {
+                        // Handle .url files by parsing the URL file directly
+                        log_error(&format!("Processing URL file: {}", path.display()));
+                        
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            // Parse the URL file content to find the URL
+                            let url = content.lines()
+                                .find_map(|line| {
+                                    if line.starts_with("URL=") {
+                                        Some(line.trim_start_matches("URL=").trim().to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .unwrap_or_default();
+                            
+                            if !url.is_empty() {
+                                let name = path.file_stem()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .into_owned();
+                                
+                                log_error(&format!("Found URL app: {} -> {}", name, url));
+                                
+                                apps.push(AppInfo {
+                                    name,
+                                    path: url,
+                                    category: "Web".into(),
+                                    icon: None,
+                                });
+                            }
                         }
                     }
                 }

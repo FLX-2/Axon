@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{CustomMenuItem, SystemTray, SystemTrayMenu, Manager, PhysicalSize, Size};
+use tauri::{Manager, PhysicalSize, Size};
 use window_shadows::set_shadow;
 use window_vibrancy::apply_blur;
 use winreg::enums::*;
@@ -38,13 +38,13 @@ use windows::Win32::System::Com::{
     CoInitializeEx, COINIT_APARTMENTTHREADED
 };
 use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
-use std::path::PathBuf;
 use md5;
+use url;
 
 mod app_manager;
 use app_manager::AppManager;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct AppInfo {
     name: String,
     path: String,
@@ -62,33 +62,104 @@ struct AppSettings {
     categories: std::collections::HashMap<String, String>,
 }
 
+// Memory cache for app scanning results
+static APP_CACHE: std::sync::OnceLock<std::sync::Mutex<Option<(Vec<AppInfo>, std::time::Instant)>>> = std::sync::OnceLock::new();
+
 #[tauri::command]
 async fn get_start_menu_apps() -> Result<Vec<AppInfo>, String> {
+    // Initialize the cache if it hasn't been initialized yet
+    let cache = APP_CACHE.get_or_init(|| {
+        std::sync::Mutex::new(None)
+    });
+    
+    // Try to get cached results first
+    {
+        let cache_guard = cache.lock().unwrap();
+        if let Some((cached_apps, timestamp)) = &*cache_guard {
+            // Cache is valid for 5 minutes
+            if timestamp.elapsed() < std::time::Duration::from_secs(300) {
+                log_error("Using cached app list");
+                return Ok(cached_apps.clone());
+            }
+        }
+    }
+    
+    log_error("Scanning start menu apps (cache expired or not found)");
     let mut apps = Vec::new();
+    
+    // First, clear the cache to ensure fresh scan
+    let cache = APP_CACHE.get_or_init(|| {
+        std::sync::Mutex::new(None)
+    });
+    {
+        let mut cache_guard = cache.lock().unwrap();
+        *cache_guard = None;
+    }
     
     // Common Start Menu paths
     let paths = vec![
-        std::env::var("ProgramData").unwrap() + "\\Microsoft\\Windows\\Start Menu\\Programs",
-        std::env::var("APPDATA").unwrap() + "\\Microsoft\\Windows\\Start Menu\\Programs",
+        std::env::var("ProgramData").unwrap_or_default() + "\\Microsoft\\Windows\\Start Menu\\Programs",
+        std::env::var("APPDATA").unwrap_or_default() + "\\Microsoft\\Windows\\Start Menu\\Programs",
     ];
 
-    for start_menu_path in paths {
-        scan_directory(&Path::new(&start_menu_path), &mut apps)?;
+    // Log number of paths
+    log_error(&format!("Scanning {} paths", paths.len()));
+    
+    // Process each path sequentially for more reliable results
+    for path in &paths {
+        log_error(&format!("Scanning path: {}", path));
+        let mut path_apps = Vec::new();
+        if scan_directory(&Path::new(&path), &mut path_apps).is_ok() {
+            log_error(&format!("Found {} apps in {}", path_apps.len(), path));
+            apps.extend(path_apps);
+        }
+    }
+    
+    log_error(&format!("Total apps found: {}", apps.len()));
+    
+    // Update cache
+    {
+        let mut cache_guard = cache.lock().unwrap();
+        *cache_guard = Some((apps.clone(), std::time::Instant::now()));
     }
 
     Ok(apps)
 }
 
 fn scan_directory(dir: &Path, apps: &mut Vec<AppInfo>) -> Result<(), String> {
+    // Log directory scanning
+    log_error(&format!("Scanning directory: {}", dir.display()));
+    
+    // Skip only very specific system directories
+    let dir_name = dir.file_name().map(|n| n.to_string_lossy().to_lowercase());
+    if let Some(name) = dir_name {
+        // Skip only Windows system directories by exact match
+        let skip_dirs = [
+            "windows", "system32", "systemapps", "syswow64",
+            "winsxs", "assembly", "microsoft.net"
+        ];
+        
+        if skip_dirs.iter().any(|&skip| name == skip) {
+            log_error(&format!("Skipping system directory: {}", dir.display()));
+            return Ok(());
+        }
+    }
+    
+    // No maximum entry limit - scan all entries
+    
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             
             if path.is_dir() {
+                // Recursively scan subdirectory with more permissive rules
                 scan_directory(&path, apps)?;
             } else if let Some(ext) = path.extension() {
-                if ext == "lnk" || ext == "exe" || ext == "url" {
+                let ext_str = ext.to_string_lossy().to_lowercase();
+                // Process both .lnk and .url files
+                if ext_str == "lnk" || ext_str == "url" {
                     if let Some(app_info) = create_app_info(&path) {
+                        log_error(&format!("Found app: {}", app_info.name));
                         apps.push(app_info);
                     }
                 }
@@ -145,12 +216,53 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
         );
 
         if result == 0 || file_info.hIcon.is_invalid() {
-            // If first attempt fails, try with the executable directly
-            if path.to_lowercase().ends_with(".lnk") {
+            // If first attempt fails, handle different file types
+            let path_lower = path.to_lowercase();
+            
+            if path_lower.ends_with(".lnk") {
+                // For .lnk files, get icon from target
                 if let Ok(target_path) = resolve_shortcut(path) {
                     return get_app_icon_internal(&target_path);
                 }
+            } else if path_lower.ends_with(".url") {
+                // For .url files, use default browser icon or parse the URL file
+                log_error(&format!("Getting icon for URL file: {}", path));
+                
+                // Try to read the URL file to extract the URL
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    // Look for the URL= line in the file
+                    if let Some(url_line) = content.lines().find(|line| line.starts_with("URL=")) {
+                        let url = url_line.trim_start_matches("URL=").trim();
+                        
+                        // Try to get favicon using the domain's favicon.ico
+                        if url.starts_with("http") {
+                            if let Ok(url) = url::Url::parse(url) {
+                                if let Some(domain) = url.host_str() {
+                                    // Use browser icon as fallback
+                                    let browsers = [
+                                        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                                        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+                                        "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
+                                    ];
+                                    
+                                    for browser in browsers {
+                                        if std::path::Path::new(browser).exists() {
+                                            return get_app_icon_internal(browser);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Default to Edge browser icon if all else fails
+                let edge_path = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+                if std::path::Path::new(edge_path).exists() {
+                    return get_app_icon_internal(edge_path);
+                }
             }
+            
             return Err("Failed to get icon".into());
         }
 
@@ -381,7 +493,7 @@ async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String,
 #[tauri::command]
 async fn remove_custom_icon(app_path: String) -> Result<String, String> {
     // Get the app's data directory
-    let app_data_dir = tauri::api::path::app_dir(&tauri::Config::default())
+    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
         .ok_or_else(|| "Failed to get app directory".to_string())?;
     
     let custom_icons_dir = app_data_dir.join("custom_icons");
@@ -490,11 +602,10 @@ fn log_error(error: &str) {
         .append(true)
         .open("app.log")
     {
-        if let Err(e) = writeln!(file, "{}: {}", chrono::Local::now(), error) {
-            eprintln!("Failed to write to log file: {}", e);
-        }
+        let _ = writeln!(file, "{}: {}", chrono::Local::now(), error);
     }
 }
+
 
 fn main() {
     log_error("Application starting...");
@@ -508,21 +619,16 @@ fn main() {
             }
         }
         
-        let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-        let show = CustomMenuItem::new("show".to_string(), "Show");
-        let hide = CustomMenuItem::new("hide".to_string(), "Hide");
+        log_error("Starting application without system tray...");
         
-        let tray_menu = SystemTrayMenu::new()
-            .add_item(show)
-            .add_item(hide)
-            .add_item(quit);
-        
-        let tray = SystemTray::new().with_menu(tray_menu);
-
         let app = tauri::Builder::default()
-            .system_tray(tray)
+            .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+                app.get_window("main").unwrap().show().unwrap();
+                app.get_window("main").unwrap().set_focus().unwrap();
+            }))
             .setup(|app| {
                 let main_window = app.get_window("main").unwrap();
+                let _app_handle = app.handle();
                 
                 // Get the current monitor's size
                 if let Some(monitor) = main_window.current_monitor().unwrap() {
@@ -530,7 +636,7 @@ fn main() {
                     let scale_factor = monitor.scale_factor();
                     
                     // Convert physical pixels to logical pixels
-                    let logical_width = size.width as f64 / scale_factor;
+                    let _logical_width = size.width as f64 / scale_factor;
                     let logical_height = size.height as f64 / scale_factor;
                     
                     // Calculate window size based on screen resolution
@@ -564,16 +670,6 @@ fn main() {
                     log_error(&format!("Failed to apply shadow: {:?}", e));
                 }
 
-                // Instead of using on_drag_event, we'll handle it through window events
-                window.on_window_event(move |event| {
-                    match event {
-                        tauri::WindowEvent::FileDrop(_) => {
-                            // Ignore file drop events
-                        }
-                        _ => {}
-                    }
-                });
-
                 window.set_decorations(false).unwrap();
                 window.set_always_on_top(false).unwrap();
                 window.set_skip_taskbar(false).unwrap();
@@ -586,70 +682,13 @@ fn main() {
                 log_error("Setup completed successfully");
                 Ok(())
             })
+            // Handle window close events to completely exit the application
             .on_window_event(|event| {
-                match event.event() {
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        // Get the minimize_to_tray setting from the frontend
-                        let minimize_to_tray = true; // Default value
-                        // In a real implementation, we would get this from the frontend store
-                        
-                        if minimize_to_tray {
-                            // Minimize to tray instead of closing
-                            event.window().hide().unwrap();
-                            api.prevent_close();
-                        } else {
-                            // Close the app completely
-                            std::process::exit(0);
-                        }
-                    }
-                    _ => {}
-                }
-            })
-            .on_system_tray_event(|app, event| {
-                match event {
-                    tauri::SystemTrayEvent::MenuItemClick { id, .. } => {
-                        let window = app.get_window("main").unwrap();
-                        match id.as_str() {
-                            "quit" => {
-                                std::process::exit(0);
-                            }
-                            "show" => {
-                                if let Err(e) = window.show() {
-                                    log_error(&format!("Failed to show window: {:?}", e));
-                                }
-                                if let Err(e) = window.set_focus() {
-                                    log_error(&format!("Failed to focus window: {:?}", e));
-                                }
-                            }
-                            "hide" => {
-                                if let Err(e) = window.hide() {
-                                    log_error(&format!("Failed to hide window: {:?}", e));
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    tauri::SystemTrayEvent::LeftClick { .. } => {
-                        let window = app.get_window("main").unwrap();
-                        match window.is_visible() {
-                            Ok(visible) => {
-                                if visible {
-                                    if let Err(e) = window.hide() {
-                                        log_error(&format!("Failed to hide window: {:?}", e));
-                                    }
-                                } else {
-                                    if let Err(e) = window.show() {
-                                        log_error(&format!("Failed to show window: {:?}", e));
-                                    }
-                                    if let Err(e) = window.set_focus() {
-                                        log_error(&format!("Failed to focus window: {:?}", e));
-                                    }
-                                }
-                            }
-                            Err(e) => log_error(&format!("Failed to check window visibility: {:?}", e)),
-                        }
-                    }
-                    _ => {}
+                if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                    log_error("Window close requested - exiting application");
+                    
+                    // Force a complete exit to ensure no background processes remain
+                    std::process::exit(0);
                 }
             })
             .invoke_handler(tauri::generate_handler![
@@ -662,9 +701,10 @@ fn main() {
                 remove_custom_icon,
                 shell_open,
                 load_app_settings,
-                save_app_settings
+                save_app_settings,
             ]);
 
+        log_error("Starting application...");
         log_error("Starting application...");
         if let Err(e) = app.run(tauri::generate_context!()) {
             log_error(&format!("Application failed to run: {:?}", e));

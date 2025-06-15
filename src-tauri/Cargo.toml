@@ -14,7 +14,8 @@ build = "build.rs"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "window-hide", "window-start-dragging", "fs-read-dir", "window-unmaximize", "window-show", "window-close", "dialog-open", "fs-exists", "fs-write-file", "fs-read-file", "window-maximize", "window-unminimize", "window-minimize", "system-tray", "shell-open"] }
+tauri = { version = "1.5", features = [ "window-hide", "window-start-dragging", "fs-read-dir", "window-unmaximize", "window-show", "window-close", "dialog-open", "fs-exists", "fs-write-file", "fs-read-file", "window-maximize", "window-unminimize", "window-minimize", "shell-open"] }
+tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 window-shadows = "0.2.2"
@@ -37,6 +38,7 @@ windows = { version = "0.51.1", features = [
 ] }
 chrono = "0.4"
 md5 = "0.7" # Added for hashing
+url = "2.4.1" # Added for URL parsing
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

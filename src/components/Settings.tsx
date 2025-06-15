@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw } from 'lucide-react';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar } from 'lucide-react';
 
 // Utility function to determine if a color is dark
 const isColorDark = (hexColor: string) => {
@@ -37,10 +37,8 @@ export const Settings: React.FC = () => {
   const settings = useSettingsStore();
   const {
     launchAtStartup,
-    minimizeToTray,
     themeMode,
     setLaunchAtStartup,
-    setMinimizeToTray,
     setThemeMode,
     colors,
     setAccentColor,
@@ -60,10 +58,11 @@ export const Settings: React.FC = () => {
       <div className="space-y-6">
         <div className="space-y-4">
           <h3 className="text-sm font-medium">Theme</h3>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 flex-wrap gap-2">
             {[
               { value: 'light' as const, icon: Sun, label: 'Light' },
               { value: 'dark' as const, icon: Moon, label: 'Dark' },
+              { value: 'black' as const, icon: MoonStar, label: 'Black' },
               { value: 'system' as const, icon: Monitor, label: 'System' },
             ].map((option) => {
               const isSelected = themeMode === option.value;
@@ -98,11 +97,6 @@ export const Settings: React.FC = () => {
               checked={launchAtStartup}
               onChange={setLaunchAtStartup}
               label="Launch at startup"
-            />
-            <Toggle
-              checked={minimizeToTray}
-              onChange={setMinimizeToTray}
-              label="Minimize to tray"
             />
           </div>
         </div>

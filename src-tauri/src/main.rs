@@ -596,14 +596,9 @@ async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
     Ok(())
 }
 
-fn log_error(error: &str) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("app.log")
-    {
-        let _ = writeln!(file, "{}: {}", chrono::Local::now(), error);
-    }
+// Empty logging function that does nothing - completely eliminates logging
+fn log_error(_error: &str) {
+    // No logging at all
 }
 
 
@@ -685,21 +680,39 @@ fn main() {
                     let scale_factor = monitor.scale_factor();
                     
                     // Convert physical pixels to logical pixels
-                    let _logical_width = size.width as f64 / scale_factor;
+                    let logical_width = size.width as f64 / scale_factor;
                     let logical_height = size.height as f64 / scale_factor;
                     
-                    // Calculate window size based on screen resolution
-                    // Keep aspect ratio of 1.67 (1500/900)
-                    let window_size = match logical_height as u32 {
-                        h if h <= 720 => (1000, 600),    // 720p
-                        h if h <= 1080 => (1200, 720),   // 1080p
-                        h if h <= 1440 => (1500, 900),   // 1440p
-                        _ => (1800, 1080),               // 4K and above
+                    // Log screen dimensions for debugging
+                    log_error(&format!("Screen dimensions: {}x{} (logical: {}x{}), scale factor: {}",
+                        size.width, size.height, logical_width, logical_height, scale_factor));
+                    
+                    // Calculate window size as a percentage of screen size
+                    // Use 75% of screen width/height for smaller screens, 65% for larger screens
+                    let screen_percentage = if logical_height <= 768.0 {
+                        0.75 // 75% of screen size for smaller screens
+                    } else if logical_height <= 1080.0 {
+                        0.70 // 70% for medium screens
+                    } else {
+                        0.65 // 65% for larger screens
                     };
                     
+                    // Keep aspect ratio of 1.67 (1500/900)
+                    let aspect_ratio = 1.67;
+                    
+                    // Calculate dimensions based on screen size
+                    let height = (logical_height * screen_percentage).round();
+                    let width = (height * aspect_ratio).round();
+                    
+                    // Ensure width doesn't exceed screen width
+                    let width = width.min(logical_width * 0.9);
+                    
+                    log_error(&format!("Setting window size to: {}x{} ({}% of screen)",
+                        width, height, (screen_percentage * 100.0) as u32));
+                    
                     main_window.set_size(Size::Physical(PhysicalSize {
-                        width: (window_size.0 as f64 * scale_factor) as u32,
-                        height: (window_size.1 as f64 * scale_factor) as u32,
+                        width: (width * scale_factor) as u32,
+                        height: (height * scale_factor) as u32,
                     })).unwrap();
                     
                     // Center the window

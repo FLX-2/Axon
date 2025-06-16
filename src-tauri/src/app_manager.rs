@@ -12,15 +12,9 @@ use std::fs;
 use std::io::{Read, Write};
 use std::fs::OpenOptions;
 
-// Internal logging function
-fn log_error(error: &str) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("app.log")
-    {
-        let _ = writeln!(file, "[APP_MANAGER] {}: {}", chrono::Local::now(), error);
-    }
+// Empty logging function that does nothing - completely eliminates logging
+fn log_error(_error: &str) {
+    // No logging at all
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]

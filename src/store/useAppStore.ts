@@ -320,7 +320,7 @@ export const useAppStore = create<AppState>()(
   }
     }),
     {
-      name: 'app-hub-app-data',
+      name: 'axon-app-data',
       partialize: (state) => ({
         customIcons: state.customIcons,
         movedApps: state.movedApps,

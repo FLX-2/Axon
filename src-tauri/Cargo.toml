@@ -1,5 +1,5 @@
 [package]
-name = "app-hub"
+name = "axon"
 version = "0.1.0"
 description = "A modern app launcher"
 authors = ["you"]

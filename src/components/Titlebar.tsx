@@ -9,7 +9,7 @@ export const Titlebar: React.FC = () => {
       className="h-8 flex justify-between items-center bg-surfaceSecondary border-b border-border"
     >
       <div className="px-3 flex items-center">
-        <img src="/icon.png" alt="App Hub" className="w-4 h-4" />
+        <img src="/icon.png" alt="Axon" className="w-4 h-4" />
       </div>
       <div className="flex">
         <button

@@ -418,7 +418,7 @@ async fn set_launch_at_startup(enable: bool) -> Result<(), String> {
         KEY_SET_VALUE | KEY_QUERY_VALUE,
     ).map_err(|e| e.to_string())?;
 
-    let app_name = "AppHub";
+    let app_name = "Axon";
     let exe_path = std::env::current_exe()
         .map_err(|e| e.to_string())?
         .to_string_lossy()

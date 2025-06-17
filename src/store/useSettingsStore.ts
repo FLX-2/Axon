@@ -169,9 +169,9 @@ const createEfficientStorage = () => {
 
 // Cache keys
 const ACCENT_COLOR_CACHE_KEY = 'system_accent_color_cache';
-const THEME_MODE_BACKUP_KEY = 'app-hub-theme-mode-backup';
-const CUSTOM_ACCENT_KEY = 'app-hub-custom-accent';
-const IS_CUSTOM_ACCENT_KEY = 'app-hub-is-custom-accent'; // New key for flag
+const THEME_MODE_BACKUP_KEY = 'axon-theme-mode-backup';
+const CUSTOM_ACCENT_KEY = 'axon-custom-accent';
+const IS_CUSTOM_ACCENT_KEY = 'axon-is-custom-accent'; // New key for flag
 const ACCENT_COLOR_CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
 
 // Temporary fix for TypeScript types
@@ -399,7 +399,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
     }),
     {
-      name: 'app-hub-settings',
+      name: 'axon-settings',
       storage: createEfficientStorage(),
       partialize: (state) => ({
         themeMode: state.themeMode,

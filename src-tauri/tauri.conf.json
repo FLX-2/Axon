@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "App Hub",
+    "productName": "Axon",
     "version": "0.1.0"
   },
   "tauri": {
@@ -43,7 +43,7 @@
     "bundle": {
       "active": true,
       "targets": "all",
-      "identifier": "com.apphub.dev",
+      "identifier": "com.axon.dev",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -63,7 +63,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "App Hub",
+        "title": "Axon",
         "decorations": false,
         "transparent": true,
         "center": true,

@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { useAppStore } from '../store/useAppStore';
 import { FolderContextMenu } from './FolderContextMenu';
 import { useFolderStore } from '../store/useFolderStore';
+import { FolderInfo } from '../types/folder';
 
 export const Folders: React.FC = () => {
   const { isGridView } = useAppStore();

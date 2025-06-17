@@ -4,37 +4,6 @@ import { useAppStore } from '../store/useAppStore';
 import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 
-// Utility function to determine if a color is dark
-const isColorDark = (hexColor: string) => {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness < 128;
-};
-
-const Toggle: React.FC<{
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}> = ({ checked, onChange, label }) => (
-  <label className="flex items-center justify-between cursor-pointer">
-    <span className="text-sm text-textPrimary">{label}</span>
-    <div 
-      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out ${
-        checked ? 'bg-buttonSelected' : 'bg-surfaceSecondary'
-      }`}
-      onClick={() => onChange(!checked)}
-    >
-      <div
-        className={`absolute left-0.5 top-0.5 w-5 h-5 bg-textPrimary rounded-full shadow transform transition-transform duration-200 ease-in-out ${
-          checked ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </div>
-  </label>
-);
-
 export const Settings: React.FC = () => {
   const settings = useSettingsStore();
   const appStore = useAppStore();

@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface LoadingScreenProps {}
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
   const [progress, setProgress] = useState(0);
+  
+  // Get the accent color from the settings store
+  const { colors, themeMode } = useSettingsStore();
+  const activeColors = themeMode === 'dark' || themeMode === 'black' ? colors.dark : colors.light;
+  const accentColor = activeColors.accent;
   
   // Simulate progress
   useEffect(() => {
@@ -28,8 +34,11 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
         {/* Progress bar */}
         <div className="w-full h-1.5 bg-surfaceSecondary rounded-full overflow-hidden mb-2">
           <div
-            className="h-full bg-textSecondary transition-all duration-300 ease-out"
-            style={{ width: `${progress}%` }}
+            className="h-full transition-all duration-300 ease-out"
+            style={{
+              width: `${progress}%`,
+              backgroundColor: accentColor
+            }}
           ></div>
         </div>
         

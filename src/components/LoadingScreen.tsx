@@ -1,27 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useAppStore } from '../store/useAppStore';
 
 interface LoadingScreenProps {}
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
   const [progress, setProgress] = useState(0);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Get the accent color from the settings store
   const { colors, themeMode } = useSettingsStore();
   const activeColors = themeMode === 'dark' || themeMode === 'black' ? colors.dark : colors.light;
   const accentColor = activeColors.accent;
   
-  // Simulate progress
+  // Get the actual loading state
+  const { isLoading } = useAppStore();
+  
+  // Simulate progress with acceleration when actual loading completes
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = prev + (Math.random() * 5);
-        return newProgress > 100 ? 100 : newProgress;
-      });
-    }, 150);
+    // Clear any existing interval
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
     
-    return () => clearInterval(interval);
-  }, []);
+    // Set up the progress simulation
+    progressIntervalRef.current = setInterval(() => {
+      setProgress(prev => {
+        // If actual loading is complete, accelerate progress
+        if (!isLoading) {
+          // Accelerate based on how far we are from 100%
+          const remainingProgress = 100 - prev;
+          const increment = Math.max(remainingProgress * 0.2, 5); // At least 5% or 20% of remaining
+          const newProgress = prev + increment;
+          return newProgress > 100 ? 100 : newProgress;
+        } else {
+          // Normal progress during loading
+          const newProgress = prev + (Math.random() * 3);
+          return newProgress > 95 ? 95 : newProgress; // Cap at 95% during actual loading
+        }
+      });
+    }, isLoading ? 150 : 50); // Faster updates when loading is complete
+    
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [isLoading]);
 
   return (
     <div className="fixed inset-0 bg-surfacePrimary flex items-center justify-center z-[9999]">

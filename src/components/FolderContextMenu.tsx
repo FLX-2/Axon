@@ -72,8 +72,11 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
 
   const handleRemoveIcon = async () => {
     try {
-      const originalIcon = await invoke<string>('remove_custom_icon', { appPath: folder.path });
-      updateFolderIcon(folder.path, originalIcon);
+      // Still call the backend to remove any custom icon files
+      await invoke<string>('remove_custom_icon', { appPath: folder.path });
+      // But set the icon to null instead of using the returned system icon
+      // This will make it use the generic Lucide-React Folder icon
+      updateFolderIcon(folder.path, null);
       onClose();
     } catch (error) {
       console.error('Failed to remove custom icon:', error);

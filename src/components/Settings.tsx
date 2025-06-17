@@ -2,6 +2,7 @@ import React from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAppStore } from '../store/useAppStore';
 import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw } from 'lucide-react';
+import { useDelayedLoading } from '../hooks/useDelayedLoading';
 
 // Utility function to determine if a color is dark
 const isColorDark = (hexColor: string) => {
@@ -37,6 +38,8 @@ const Toggle: React.FC<{
 export const Settings: React.FC = () => {
   const settings = useSettingsStore();
   const appStore = useAppStore();
+  // Show loading animation for at least 800ms for better UX
+  const isRefreshing = useDelayedLoading(appStore.isLoading, 800);
   const {
     themeMode,
     setThemeMode,
@@ -95,10 +98,15 @@ export const Settings: React.FC = () => {
           <div className="space-y-3">
             <button
               onClick={() => appStore.refreshApps()}
-              className="px-4 py-2 bg-surfaceSecondary hover:bg-surfaceHover text-textPrimary rounded-lg flex items-center gap-2 transition-colors"
+              disabled={isRefreshing}
+              className={`
+                px-4 py-2 bg-surfaceSecondary
+                ${!isRefreshing ? 'hover:bg-surfaceHover' : 'opacity-70 cursor-not-allowed'}
+                text-textPrimary rounded-lg flex items-center gap-2 transition-colors
+              `}
             >
-              <RefreshCw className="w-4 h-4" />
-              Reset App List
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Reset App List'}
             </button>
           </div>
         </div>

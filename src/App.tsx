@@ -8,11 +8,15 @@ import { ThemeProvider } from './components/ThemeProvider';
 import { useAppStore } from './store/useAppStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { Titlebar } from './components/Titlebar';
+import { LoadingScreen } from './components/LoadingScreen';
+import { useDelayedLoading } from './hooks/useDelayedLoading';
 
 function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { loadApps } = useAppStore();
+  const { loadApps, isLoading } = useAppStore();
   const { initializeSettings } = useSettingsStore();
+  // Show loading screen for at least 1.2 seconds for better UX
+  const showLoading = useDelayedLoading(isLoading, 1200);
 
   useEffect(() => {
     loadApps();
@@ -22,6 +26,7 @@ function App() {
   return (
     <ThemeProvider>
       <div className="h-screen flex flex-col fixed inset-0 overflow-hidden bg-surfacePrimary text-textPrimary">
+        {showLoading && <LoadingScreen />}
         <Titlebar />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar 

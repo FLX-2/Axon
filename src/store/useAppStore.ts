@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AppInfo } from '../types/app';
-import { loadStartMenuApps, getAppIcon } from '../lib/system';
+import { loadStartMenuApps, refreshStartMenuApps, getAppIcon } from '../lib/system';
 
 // Helper functions for icon loading and caching
 // Polyfill for requestIdleCallback
@@ -125,6 +125,7 @@ interface AppState {
   updateLastAccessed: (path: string, timestamp: string) => void;
   updateCategory: (path: string, category: AppInfo['category']) => void;
   loadApps: () => Promise<void>;
+  refreshApps: () => Promise<void>;
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => void;
   moveApp: (path: string, newPath: string) => void;
@@ -213,6 +214,46 @@ export const useAppStore = create<AppState>()(
     try {
       // STEP 1: Load app metadata quickly (cached in backend)
       const apps = await loadStartMenuApps() as AppInfo[];
+      const state = get();
+      
+      // Apply all saved settings
+      const updatedApps = apps.map(newApp => {
+        const movedPath = state.movedApps[newApp.path] || newApp.path;
+        const category = state.categories[newApp.path] || newApp.category;
+        const isPinned = state.pinnedApps.includes(movedPath);
+        const lastAccessed = state.lastAccessed[newApp.path];
+
+        return {
+          ...newApp,
+          path: movedPath,
+          category,
+          isPinned,
+          lastAccessed,
+          // Initialize with placeholder icon
+          icon: state.customIcons[movedPath] || null,
+        };
+      });
+      
+      // STEP 2: Set apps without icons first for immediate display
+      set({ apps: updatedApps, isLoading: false });
+      
+      // STEP 3: Load icons in background with priority for visible apps
+      requestIdleCallback(() => {
+        loadIconsProgressively(updatedApps, state, (updatedAppsWithIcons) => {
+          set({ apps: updatedAppsWithIcons });
+        });
+      });
+    } catch (error) {
+      // Log to app logger instead of console
+      set({ isLoading: false });
+    }
+  },
+  
+  refreshApps: async () => {
+    set({ isLoading: true });
+    try {
+      // STEP 1: Force a fresh scan of start menu apps
+      const apps = await refreshStartMenuApps() as AppInfo[];
       const state = get();
       
       // Apply all saved settings

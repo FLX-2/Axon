@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/tauri';
-import { getSystemAccentColor, setStartupLaunch } from '../lib/system';
+import { getSystemAccentColor } from '../lib/system';
 
 export type ThemeMode = 'light' | 'dark' | 'black' | 'system';
 
@@ -41,10 +41,8 @@ interface SettingsState {
     dark: ThemeColors;
     black: ThemeColors;
   };
-  launchAtStartup: boolean;
   isCustomAccentColor: boolean;
   setThemeMode: (mode: ThemeMode) => void;
-  setLaunchAtStartup: (launch: boolean) => void;
   isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
@@ -186,7 +184,6 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       themeMode: 'system',
       colors: fixedDefaultColors,
-      launchAtStartup: false,
       isCustomAccentColor: false,
       isDarkMode: false,
       setThemeMode: (mode) => {
@@ -202,14 +199,6 @@ export const useSettingsStore = create<SettingsState>()(
         }
         
         set({ themeMode: mode });
-      },
-      setLaunchAtStartup: async (launch) => {
-        try {
-          await setStartupLaunch(launch);
-          set({ launchAtStartup: launch });
-        } catch (error) {
-          console.error('Failed to set launch at startup:', error);
-        }
       },
       setAccentColor: (color: string) => {
         // Save the custom accent color in a separate localStorage entry
@@ -404,7 +393,6 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         themeMode: state.themeMode,
         colors: state.colors,
-        launchAtStartup: state.launchAtStartup,
         isCustomAccentColor: state.isCustomAccentColor
       }),
       merge: (persistedState: any, currentState) => {

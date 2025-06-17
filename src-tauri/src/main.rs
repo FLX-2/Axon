@@ -66,6 +66,23 @@ struct AppSettings {
 static APP_CACHE: std::sync::OnceLock<std::sync::Mutex<Option<(Vec<AppInfo>, std::time::Instant)>>> = std::sync::OnceLock::new();
 
 #[tauri::command]
+async fn refresh_start_menu_apps() -> Result<Vec<AppInfo>, String> {
+    // Initialize the cache if it hasn't been initialized yet
+    let cache = APP_CACHE.get_or_init(|| {
+        std::sync::Mutex::new(None)
+    });
+    
+    // Explicitly clear the cache to force a fresh scan
+    {
+        let mut cache_guard = cache.lock().unwrap();
+        *cache_guard = None;
+    }
+    
+    // Call get_start_menu_apps to perform a fresh scan
+    get_start_menu_apps().await
+}
+
+#[tauri::command]
 async fn get_start_menu_apps() -> Result<Vec<AppInfo>, String> {
     // Initialize the cache if it hasn't been initialized yet
     let cache = APP_CACHE.get_or_init(|| {
@@ -410,30 +427,6 @@ async fn get_system_accent_color() -> Result<String, String> {
     Ok(format!("#{:06X}", accent_color & 0xFFFFFF))
 }
 
-#[tauri::command]
-async fn set_launch_at_startup(enable: bool) -> Result<(), String> {
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let run_key = hkcu.open_subkey_with_flags(
-        "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-        KEY_SET_VALUE | KEY_QUERY_VALUE,
-    ).map_err(|e| e.to_string())?;
-
-    let app_name = "Axon";
-    let exe_path = std::env::current_exe()
-        .map_err(|e| e.to_string())?
-        .to_string_lossy()
-        .into_owned();
-
-    if enable {
-        run_key.set_value(app_name, &exe_path)
-            .map_err(|e| e.to_string())?;
-    } else {
-        run_key.delete_value(app_name)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
 
 #[tauri::command]
 async fn launch_app(path: String) -> Result<(), String> {
@@ -758,9 +751,9 @@ fn main() {
             })
             .invoke_handler(tauri::generate_handler![
                 get_start_menu_apps,
+                refresh_start_menu_apps,
                 get_app_icon,
                 get_system_accent_color,
-                set_launch_at_startup,
                 launch_app,
                 save_custom_icon,
                 remove_custom_icon,

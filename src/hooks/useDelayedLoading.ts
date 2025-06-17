@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
  */
 export function useDelayedLoading(isLoading: boolean, minDuration: number = 1000): boolean {
   const [delayedLoading, setDelayedLoading] = useState(isLoading);
-  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
+  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(isLoading ? Date.now() : null);
 
   useEffect(() => {
     if (isLoading && !delayedLoading) {

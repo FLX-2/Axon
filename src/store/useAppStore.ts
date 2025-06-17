@@ -134,7 +134,7 @@ interface AppState {
 const initialState = {
   apps: [],
   searchTerm: '',
-  isLoading: false,
+  isLoading: true, // Start with loading state true to prevent flash of unloaded content
   isGridView: true,
   customIcons: {},
   movedApps: {},

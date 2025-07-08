@@ -64,7 +64,8 @@ This will generate an installer in `src-tauri/target/release/bundle/`.
 
 ## 🖼️ Screenshots
 
-*(Add screenshots of the application here)*
+<!-- Add your screenshots here. -->
+<!-- Example: ![Application Screenshot](screenshots/screenshot.png) -->
 
 ## 📄 License
 

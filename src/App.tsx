@@ -25,7 +25,10 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className="h-screen flex flex-col fixed inset-0 overflow-hidden bg-surfacePrimary text-textPrimary">
+      <div
+        className="h-screen flex flex-col fixed inset-0 overflow-hidden bg-surfacePrimary text-textPrimary"
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {showLoading && <LoadingScreen />}
         <Titlebar />
         <div className="flex flex-1 overflow-hidden">

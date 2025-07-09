@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, LayoutGrid, List } from 'lucide-react';
+import { Search, LayoutGrid, List, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
 export const SearchBar: React.FC = () => {
@@ -14,9 +14,17 @@ export const SearchBar: React.FC = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search apps..."
-          className="w-full pl-10 pr-4 py-2 bg-inputBg text-textPrimary border border-inputBorder rounded-lg 
-                   focus:outline-none focus:border-accent placeholder-textPlaceholder"
+          className="w-full pl-10 pr-10 py-2 bg-inputBg text-textPrimary border border-inputBorder rounded-lg
+                   focus:outline-none placeholder-textPlaceholder"
         />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-iconSecondary hover:text-textPrimary"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
       <button
         onClick={toggleView}

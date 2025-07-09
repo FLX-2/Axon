@@ -10,6 +10,7 @@ export const Titlebar: React.FC = () => {
     >
       <div className="px-3 flex items-center">
         <img src="/icon.png" alt="Axon" className="w-4 h-4" />
+        <span className="ml-2 text-sm font-semibold text-textPrimary">Axon</span>
       </div>
       <div className="flex">
         <button

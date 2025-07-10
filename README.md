@@ -1,6 +1,6 @@
 # Axon
 
-![Axon Icon](public/icon.png)
+![Axon Banner](axonBanner.png)
 
 Axon is a sleek and modern application launcher for Windows, built with Tauri, React, and Rust. It provides a fast and customizable way to access and organize your applications.
 
@@ -66,7 +66,7 @@ This will generate an installer in `src-tauri/target/release/bundle/`.
 
 <!-- Add your screenshots here. -->
 <!-- Example: ![Application Screenshot](screenshots/screenshot.png) -->
-![Application Screenshot](screenshots/axon2.jpg)
+![Axon Screenshot](axonScreenshot.jpg)
 
 ## 📄 License
 

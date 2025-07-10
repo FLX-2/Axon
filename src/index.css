@@ -88,5 +88,5 @@ textarea,
 .app-icon {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
-  border-radius: 8px;
+  border-radius: 3px;
 }

@@ -453,6 +453,9 @@ async fn launch_app(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String, String> {
+    use image::{ImageFormat, DynamicImage, imageops::FilterType};
+    
+    
     // Get the app's data directory
     let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
         .ok_or_else(|| "Failed to get app data directory".to_string())?;
@@ -467,20 +470,101 @@ async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String,
     let hash = format!("{:x}", md5::compute(&app_path));
     let icon_path = custom_icons_dir.join(format!("{}.png", hash));
 
-    // Decode base64 and save the image
-    let icon_bytes = base64::engine::general_purpose::STANDARD
-        .decode(icon_data.split(",").last().unwrap_or(&icon_data))
+    // Decode base64 image data
+    let icon_bytes = STANDARD
+        .decode(&icon_data)
         .map_err(|e| format!("Failed to decode icon data: {}", e))?;
 
-    // Write the file atomically to prevent any file system watchers from triggering
+    // Load and process the image
+    let img = image::load_from_memory(&icon_bytes)
+        .map_err(|e| format!("Failed to load image: {}", e))?;
+
+    // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
+    let resized = img.resize(128, 128, FilterType::Lanczos3);
+
+    // Save as PNG with optimal compression
+    let mut output_buffer = Vec::new();
+    resized.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
+        .map_err(|e| format!("Failed to encode image: {}", e))?;
+
+    // Write the file atomically
     let temp_path = icon_path.with_extension("tmp");
-    fs::write(&temp_path, &icon_bytes)
+    fs::write(&temp_path, &output_buffer)
         .map_err(|e| format!("Failed to save temporary icon: {}", e))?;
     
     fs::rename(&temp_path, &icon_path)
         .map_err(|e| format!("Failed to save icon: {}", e))?;
 
-    Ok(icon_path.to_string_lossy().into_owned())
+    // Return the processed image as base64 for immediate UI update
+    let base64_result = format!("data:image/png;base64,{}", STANDARD.encode(&output_buffer));
+    Ok(base64_result)
+}
+
+#[tauri::command]
+async fn save_custom_folder_icon(folder_path: String, icon_data: String) -> Result<String, String> {
+    use image::{ImageFormat, imageops::FilterType};
+    
+    // Get the app's data directory
+    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
+        .ok_or_else(|| "Failed to get app data directory".to_string())?;
+    
+    let custom_icons_dir = app_data_dir.join("custom_folder_icons");
+    if !custom_icons_dir.exists() {
+        fs::create_dir_all(&custom_icons_dir)
+            .map_err(|e| format!("Failed to create custom folder icons directory: {}", e))?;
+    }
+
+    // Create a unique filename based on the folder path
+    let hash = format!("{:x}", md5::compute(&folder_path));
+    let icon_path = custom_icons_dir.join(format!("{}.png", hash));
+
+    // Decode base64 image data
+    let icon_bytes = STANDARD
+        .decode(&icon_data)
+        .map_err(|e| format!("Failed to decode icon data: {}", e))?;
+
+    // Load and process the image
+    let img = image::load_from_memory(&icon_bytes)
+        .map_err(|e| format!("Failed to load image: {}", e))?;
+
+    // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
+    let resized = img.resize(128, 128, FilterType::Lanczos3);
+
+    // Save as PNG with optimal compression
+    let mut output_buffer = Vec::new();
+    resized.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
+        .map_err(|e| format!("Failed to encode image: {}", e))?;
+
+    // Write the file atomically
+    let temp_path = icon_path.with_extension("tmp");
+    fs::write(&temp_path, &output_buffer)
+        .map_err(|e| format!("Failed to save temporary icon: {}", e))?;
+    
+    fs::rename(&temp_path, &icon_path)
+        .map_err(|e| format!("Failed to save icon: {}", e))?;
+
+    // Return the processed image as base64 for immediate UI update
+    let base64_result = format!("data:image/png;base64,{}", STANDARD.encode(&output_buffer));
+    Ok(base64_result)
+}
+
+#[tauri::command]
+async fn remove_custom_folder_icon(folder_path: String) -> Result<String, String> {
+    // Get the app's data directory
+    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
+        .ok_or_else(|| "Failed to get app directory".to_string())?;
+    
+    let custom_icons_dir = app_data_dir.join("custom_folder_icons");
+    let hash = format!("{:x}", md5::compute(&folder_path));
+    let icon_path = custom_icons_dir.join(format!("{}.png", hash));
+
+    // Remove the icon file if it exists
+    if icon_path.exists() {
+        fs::remove_file(&icon_path)
+            .map_err(|e| format!("Failed to remove custom folder icon: {}", e))?;
+    }
+
+    Ok("Folder icon removed".to_string())
 }
 
 #[tauri::command]
@@ -756,7 +840,9 @@ fn main() {
                 get_system_accent_color,
                 launch_app,
                 save_custom_icon,
+                save_custom_folder_icon,
                 remove_custom_icon,
+                remove_custom_folder_icon,
                 shell_open,
                 load_app_settings,
                 save_app_settings,

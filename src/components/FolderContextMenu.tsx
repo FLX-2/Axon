@@ -72,14 +72,13 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
 
   const handleRemoveIcon = async () => {
     try {
-      // Still call the backend to remove any custom icon files
-      await invoke<string>('remove_custom_icon', { appPath: folder.path });
-      // But set the icon to null instead of using the returned system icon
-      // This will make it use the generic Lucide-React Folder icon
+      // Remove custom folder icon
+      await invoke<string>('remove_custom_folder_icon', { folderPath: folder.path });
+      // Reset to default folder icon
       updateFolderIcon(folder.path, "");
       onClose();
     } catch (error) {
-      console.error('Failed to remove custom icon:', error);
+      console.error('Failed to remove custom folder icon:', error);
     }
   };
 
@@ -128,13 +127,16 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
                   if (file) {
                     const reader = new FileReader();
                     reader.onload = async (e) => {
-                      const base64data = e.target?.result as string;
+                      const dataUrl = e.target?.result as string;
+                      // Extract base64 data from data URL (remove "data:image/...;base64," prefix)
+                      const base64data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+                      
                       try {
-                        await invoke('save_custom_icon', { appPath: folder.path, iconData: base64data });
-                        updateFolderIcon(folder.path, base64data);
+                        const processedIcon = await invoke('save_custom_folder_icon', { folderPath: folder.path, iconData: base64data });
+                        updateFolderIcon(folder.path, processedIcon as string);
                         onClose();
                       } catch (error) {
-                        console.error('Failed to save custom icon:', error);
+                        console.error('Failed to save custom folder icon:', error);
                       }
                     };
                     reader.readAsDataURL(file);

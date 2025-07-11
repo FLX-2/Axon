@@ -168,10 +168,13 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
                     if (file) {
                       const reader = new FileReader();
                       reader.onload = async (e) => {
-                        const base64data = e.target?.result as string;
+                        const dataUrl = e.target?.result as string;
+                        // Extract base64 data from data URL (remove "data:image/...;base64," prefix)
+                        const base64data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+                        
                         try {
-                          await invoke('save_custom_icon', { appPath: app.path, iconData: base64data });
-                          updateAppIcon(app.path, base64data);
+                          const processedIcon = await invoke('save_custom_icon', { appPath: app.path, iconData: base64data });
+                          updateAppIcon(app.path, processedIcon as string);
                           onClose();
                         } catch (error) {
                           console.error('Failed to save custom icon:', error);

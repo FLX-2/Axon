@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { AppList } from './components/AppList';
 import { Settings } from './components/Settings';
@@ -15,8 +15,15 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { loadApps, isLoading } = useAppStore();
   const { initializeSettings } = useSettingsStore();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   // Show loading screen for at least 1.2 seconds for better UX
   const showLoading = useDelayedLoading(isLoading, 1200);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [selectedCategory]);
 
   useEffect(() => {
     loadApps();
@@ -38,7 +45,7 @@ function App() {
           />
           <div className="flex-1 flex flex-col overflow-hidden">
             <SearchBar />
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
               {selectedCategory === 'Settings' ? (
                 <Settings />
               ) : selectedCategory === 'Folders' ? (

@@ -162,7 +162,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
                 onClick={() => {
                   const fileInput = document.createElement('input');
                   fileInput.type = 'file';
-                  fileInput.accept = 'image/*';
+                  fileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
                   fileInput.onchange = (e) => {
                     const file = (e.target as HTMLInputElement).files?.[0];
                     if (file) {

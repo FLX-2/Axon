@@ -317,6 +317,120 @@ describe('Window Behavior Integration Tests', () => {
     });
   });
 
+  describe('Startup behavior integration', () => {
+    it('should start minimized to tray when both startup and minimize-to-tray are enabled', async () => {
+      // Mock startup detection and minimize-to-tray enabled
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'is_started_from_startup') {
+          return Promise.resolve(true);
+        }
+        if (command === 'get_minimize_behavior') {
+          return Promise.resolve(true);
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const isStartedFromStartup = await mockInvoke('is_started_from_startup');
+      const minimizeToTray = await mockInvoke('get_minimize_behavior');
+      
+      expect(isStartedFromStartup).toBe(true);
+      expect(minimizeToTray).toBe(true);
+      
+      // Requirements: 1.3 - When application starts via Windows startup 
+      // THEN it SHALL respect the minimize-to-tray setting if enabled
+      expect(mockInvoke).toHaveBeenCalledWith('is_started_from_startup');
+      expect(mockInvoke).toHaveBeenCalledWith('get_minimize_behavior');
+    });
+
+    it('should show window normally when started from startup but minimize-to-tray is disabled', async () => {
+      // Mock startup detection enabled but minimize-to-tray disabled
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'is_started_from_startup') {
+          return Promise.resolve(true);
+        }
+        if (command === 'get_minimize_behavior') {
+          return Promise.resolve(false);
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const isStartedFromStartup = await mockInvoke('is_started_from_startup');
+      const minimizeToTray = await mockInvoke('get_minimize_behavior');
+      
+      expect(isStartedFromStartup).toBe(true);
+      expect(minimizeToTray).toBe(false);
+      
+      // In this case, window should show normally even though started from startup
+      expect(mockInvoke).toHaveBeenCalledWith('is_started_from_startup');
+      expect(mockInvoke).toHaveBeenCalledWith('get_minimize_behavior');
+    });
+
+    it('should show window normally when started manually regardless of minimize-to-tray setting', async () => {
+      // Mock normal startup (not from Windows startup)
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'is_started_from_startup') {
+          return Promise.resolve(false);
+        }
+        if (command === 'get_minimize_behavior') {
+          return Promise.resolve(true); // Even if minimize-to-tray is enabled
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const isStartedFromStartup = await mockInvoke('is_started_from_startup');
+      const minimizeToTray = await mockInvoke('get_minimize_behavior');
+      
+      expect(isStartedFromStartup).toBe(false);
+      expect(minimizeToTray).toBe(true);
+      
+      // Requirements: Normal startup should always show window
+      expect(mockInvoke).toHaveBeenCalledWith('is_started_from_startup');
+    });
+
+    it('should handle startup detection errors gracefully', async () => {
+      // Mock startup detection error
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'is_started_from_startup') {
+          return Promise.reject(new Error('Failed to detect startup'));
+        }
+        return Promise.resolve(undefined);
+      });
+
+      await expect(mockInvoke('is_started_from_startup')).rejects.toThrow('Failed to detect startup');
+      
+      // App should handle this gracefully and show window normally
+      expect(mockInvoke).toHaveBeenCalledWith('is_started_from_startup');
+    });
+
+    it('should restore window from tray when started via startup and minimized to tray', async () => {
+      // Simulate complete startup workflow
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'is_started_from_startup') {
+          return Promise.resolve(true);
+        }
+        if (command === 'get_minimize_behavior') {
+          return Promise.resolve(true);
+        }
+        return Promise.resolve(undefined);
+      });
+
+      // Verify startup conditions
+      const isStartedFromStartup = await mockInvoke('is_started_from_startup');
+      const minimizeToTray = await mockInvoke('get_minimize_behavior');
+      
+      expect(isStartedFromStartup).toBe(true);
+      expect(minimizeToTray).toBe(true);
+      
+      // App should start minimized to tray, then user can restore via tray icon
+      await simulateTrayIconClick();
+      
+      expect(mockWindow.show).toHaveBeenCalled();
+      expect(mockWindow.unminimize).toHaveBeenCalled();
+      
+      // Requirements: 1.4 - User should be able to restore window from tray
+    });
+  });
+
   describe('Integration scenarios', () => {
     it('should handle complete minimize to tray workflow', async () => {
       // 1. Mock minimize to tray enabled

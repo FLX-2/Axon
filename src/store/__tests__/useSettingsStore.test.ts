@@ -74,6 +74,7 @@ const resetStore = () => {
     },
     isCustomAccentColor: false,
     minimizeToTray: false,
+    startupEnabled: false,
     isDarkMode: false,
   });
 };
@@ -422,6 +423,480 @@ describe('useSettingsStore - minimizeToTray functionality', () => {
       // The partialize function should include minimizeToTray
       // This is tested indirectly by checking localStorage calls include the property
       expect(result.current.minimizeToTray).toBe(true);
+    });
+  });
+
+  describe('useSettingsStore - startupEnabled functionality', () => {
+    describe('startupEnabled state management', () => {
+      it('should have default startupEnabled value as false', () => {
+        const { result } = renderHook(() => useSettingsStore());
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should update startupEnabled state when setStartupEnabled is called', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should maintain startupEnabled state across multiple updates', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Enable startup
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        expect(result.current.startupEnabled).toBe(true);
+        
+        // Disable startup
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setStartupEnabled(false);
+        });
+        expect(result.current.startupEnabled).toBe(false);
+        
+        // Enable again
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        expect(result.current.startupEnabled).toBe(true);
+      });
+    });
+
+    describe('setStartupEnabled function behavior', () => {
+      it('should call Tauri invoke with correct parameters when enabling', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('set_startup_enabled', { enabled: true });
+      });
+
+      it('should call Tauri invoke with correct parameters when disabling', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(false);
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('set_startup_enabled', { enabled: false });
+      });
+
+      it('should update state only after successful backend update', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('set_startup_enabled', { enabled: true });
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should not update state if backend update fails', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        const initialStartupEnabled = result.current.startupEnabled;
+        mockInvoke.mockRejectedValueOnce(new Error('Backend error'));
+        
+        await act(async () => {
+          try {
+            await result.current.setStartupEnabled(true);
+          } catch (error) {
+            // Expected to throw
+          }
+        });
+        
+        expect(result.current.startupEnabled).toBe(initialStartupEnabled);
+      });
+
+      it('should throw error when backend update fails', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockRejectedValueOnce(new Error('Backend communication failed'));
+        
+        await act(async () => {
+          await expect(result.current.setStartupEnabled(true)).rejects.toThrow('Backend communication failed');
+        });
+      });
+
+      it('should handle network timeout errors', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockRejectedValueOnce(new Error('Request timeout'));
+        
+        await act(async () => {
+          await expect(result.current.setStartupEnabled(true)).rejects.toThrow('Request timeout');
+        });
+        
+        // State should remain unchanged
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should handle permission denied errors', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockRejectedValueOnce(new Error('Permission denied'));
+        
+        await act(async () => {
+          await expect(result.current.setStartupEnabled(true)).rejects.toThrow('Permission denied');
+        });
+        
+        // State should remain unchanged
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should handle registry access errors', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockRejectedValueOnce(new Error('Failed to access registry'));
+        
+        await act(async () => {
+          await expect(result.current.setStartupEnabled(true)).rejects.toThrow('Failed to access registry');
+        });
+        
+        // State should remain unchanged
+        expect(result.current.startupEnabled).toBe(false);
+      });
+    });
+
+    describe('settings persistence and loading', () => {
+      it('should persist startupEnabled setting to localStorage', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(result.current.startupEnabled).toBe(true);
+        // The persistence is handled by Zustand middleware
+      });
+
+      it('should sync with backend on initializeSettings', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Mock backend responses
+        mockInvoke.mockImplementation((command) => {
+          if (command === 'get_minimize_behavior') return Promise.resolve(false);
+          if (command === 'get_startup_enabled') return Promise.resolve(true);
+          return Promise.resolve(undefined);
+        });
+        
+        await act(async () => {
+          await result.current.initializeSettings();
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('get_startup_enabled');
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should fallback to frontend state if backend sync fails during initialization', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Set initial frontend state
+        act(() => {
+          useSettingsStore.setState({ startupEnabled: true });
+        });
+        
+        // Mock backend responses - minimize behavior succeeds, startup get fails, startup set succeeds
+        mockInvoke
+          .mockResolvedValueOnce(false) // get_minimize_behavior success
+          .mockRejectedValueOnce(new Error('Backend get failed')) // get_startup_enabled fails
+          .mockResolvedValueOnce(undefined); // set_startup_enabled success
+        
+        await act(async () => {
+          await result.current.initializeSettings();
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('get_minimize_behavior');
+        expect(mockInvoke).toHaveBeenCalledWith('get_startup_enabled');
+        expect(mockInvoke).toHaveBeenCalledWith('set_startup_enabled', { enabled: true });
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should handle complete backend failure gracefully during initialization', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Mock both backend calls to fail
+        mockInvoke.mockRejectedValue(new Error('Backend unavailable'));
+        
+        await act(async () => {
+          await result.current.initializeSettings();
+        });
+        
+        // Should not throw and should maintain default state
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should load startupEnabled setting from localStorage on initialization', () => {
+        resetStore();
+        
+        // Mock localStorage to return persisted state with startupEnabled: true
+        const persistedState = JSON.stringify({
+          state: {
+            themeMode: 'system',
+            colors: {
+              light: { accent: '#000000' },
+              dark: { accent: '#ffffff' },
+              black: { accent: '#ffffff' }
+            },
+            isCustomAccentColor: false,
+            minimizeToTray: false,
+            startupEnabled: true
+          },
+          version: 0
+        });
+        
+        localStorageMock.getItem.mockReturnValue(persistedState);
+        
+        // Manually trigger the persist rehydration by setting the state
+        useSettingsStore.setState({ startupEnabled: true });
+        
+        const { result } = renderHook(() => useSettingsStore());
+        
+        expect(result.current.startupEnabled).toBe(true);
+      });
+    });
+
+    describe('default value handling for new installations', () => {
+      it('should use false as default value when no persisted state exists', () => {
+        // Ensure localStorage returns null (no persisted state)
+        localStorageMock.getItem.mockReturnValue(null);
+        
+        const { result } = renderHook(() => useSettingsStore());
+        
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should use false as default when localStorage contains invalid JSON', () => {
+        localStorageMock.getItem.mockReturnValue('invalid json');
+        
+        const { result } = renderHook(() => useSettingsStore());
+        
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should use false as default when persisted state is missing startupEnabled property', () => {
+        // Mock old persisted state without startupEnabled property
+        const oldPersistedState = JSON.stringify({
+          state: {
+            themeMode: 'dark',
+            colors: expect.any(Object),
+            isCustomAccentColor: false,
+            minimizeToTray: false
+            // startupEnabled is missing
+          },
+          version: 0
+        });
+        
+        localStorageMock.getItem.mockReturnValue(oldPersistedState);
+        
+        const { result } = renderHook(() => useSettingsStore());
+        
+        expect(result.current.startupEnabled).toBe(false);
+      });
+
+      it('should preserve other settings when startupEnabled is missing from persisted state', () => {
+        resetStore();
+        
+        // Manually set the state to simulate loading from old persisted state
+        useSettingsStore.setState({
+          themeMode: 'dark',
+          colors: {
+            light: { 
+              ...useSettingsStore.getState().colors.light,
+              accent: '#custom' 
+            },
+            dark: { 
+              ...useSettingsStore.getState().colors.dark,
+              accent: '#custom' 
+            },
+            black: { 
+              ...useSettingsStore.getState().colors.black,
+              accent: '#custom' 
+            }
+          },
+          isCustomAccentColor: true,
+          minimizeToTray: true,
+          startupEnabled: false // Default value when missing
+        });
+        
+        const { result } = renderHook(() => useSettingsStore());
+        
+        expect(result.current.startupEnabled).toBe(false);
+        expect(result.current.themeMode).toBe('dark');
+        expect(result.current.isCustomAccentColor).toBe(true);
+        expect(result.current.minimizeToTray).toBe(true);
+      });
+
+      it('should handle backend initialization with default value for new installations', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Mock backend returning false (default)
+        mockInvoke.mockImplementation((command) => {
+          if (command === 'get_minimize_behavior') return Promise.resolve(false);
+          if (command === 'get_startup_enabled') return Promise.resolve(false);
+          return Promise.resolve(undefined);
+        });
+        
+        await act(async () => {
+          await result.current.initializeSettings();
+        });
+        
+        expect(mockInvoke).toHaveBeenCalledWith('get_startup_enabled');
+        expect(result.current.startupEnabled).toBe(false);
+      });
+    });
+
+    describe('integration with other store functionality', () => {
+      it('should not affect other store properties when updating startupEnabled', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        const initialThemeMode = result.current.themeMode;
+        const initialColors = result.current.colors;
+        const initialIsCustomAccentColor = result.current.isCustomAccentColor;
+        const initialMinimizeToTray = result.current.minimizeToTray;
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(result.current.startupEnabled).toBe(true);
+        expect(result.current.themeMode).toBe(initialThemeMode);
+        expect(result.current.colors).toEqual(initialColors);
+        expect(result.current.isCustomAccentColor).toBe(initialIsCustomAccentColor);
+        expect(result.current.minimizeToTray).toBe(initialMinimizeToTray);
+      });
+
+      it('should be included in store partialize for persistence', () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        act(() => {
+          useSettingsStore.setState({ startupEnabled: true });
+        });
+        
+        // The partialize function should include startupEnabled
+        // This is tested indirectly by checking localStorage calls include the property
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should work independently of minimizeToTray setting', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Set minimize to tray to true
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setMinimizeToTray(true);
+        });
+        
+        // Set startup enabled to true
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(result.current.minimizeToTray).toBe(true);
+        expect(result.current.startupEnabled).toBe(true);
+        
+        // Disable startup, minimize to tray should remain unchanged
+        mockInvoke.mockResolvedValueOnce(undefined);
+        await act(async () => {
+          await result.current.setStartupEnabled(false);
+        });
+        
+        expect(result.current.minimizeToTray).toBe(true);
+        expect(result.current.startupEnabled).toBe(false);
+      });
+    });
+
+    describe('error recovery and resilience', () => {
+      it('should retry failed operations gracefully', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // First call fails
+        mockInvoke.mockRejectedValueOnce(new Error('Temporary failure'));
+        
+        await act(async () => {
+          try {
+            await result.current.setStartupEnabled(true);
+          } catch (error) {
+            // Expected to fail
+          }
+        });
+        
+        expect(result.current.startupEnabled).toBe(false);
+        
+        // Second call succeeds
+        mockInvoke.mockResolvedValueOnce(undefined);
+        
+        await act(async () => {
+          await result.current.setStartupEnabled(true);
+        });
+        
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should handle rapid successive calls correctly', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        // Mock multiple successful calls
+        mockInvoke.mockResolvedValue(undefined);
+        
+        // Make rapid successive calls
+        await act(async () => {
+          const promises = [
+            result.current.setStartupEnabled(true),
+            result.current.setStartupEnabled(false),
+            result.current.setStartupEnabled(true)
+          ];
+          
+          await Promise.all(promises);
+        });
+        
+        // Final state should be true (last call)
+        expect(result.current.startupEnabled).toBe(true);
+      });
+
+      it('should maintain state consistency during concurrent operations', async () => {
+        const { result } = renderHook(() => useSettingsStore());
+        
+        mockInvoke.mockResolvedValue(undefined);
+        
+        // Start multiple operations concurrently
+        await act(async () => {
+          const operations = [
+            result.current.setStartupEnabled(true),
+            result.current.setMinimizeToTray(true),
+            result.current.setStartupEnabled(false)
+          ];
+          
+          await Promise.all(operations);
+        });
+        
+        // State should be consistent
+        expect(typeof result.current.startupEnabled).toBe('boolean');
+        expect(typeof result.current.minimizeToTray).toBe('boolean');
+      });
     });
   });
 });

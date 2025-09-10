@@ -43,11 +43,13 @@ interface SettingsState {
   };
   isCustomAccentColor: boolean;
   minimizeToTray: boolean;
+  startupEnabled: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
   setMinimizeToTray: (enabled: boolean) => Promise<void>;
+  setStartupEnabled: (enabled: boolean) => Promise<void>;
   initializeSettings: () => Promise<void>;
 }
 
@@ -188,6 +190,7 @@ export const useSettingsStore = create<SettingsState>()(
       colors: fixedDefaultColors,
       isCustomAccentColor: false,
       minimizeToTray: false,
+      startupEnabled: false,
       isDarkMode: false,
       setThemeMode: (mode) => {
         // Save the theme mode in a separate localStorage entry
@@ -294,6 +297,19 @@ export const useSettingsStore = create<SettingsState>()(
           throw error;
         }
       },
+      setStartupEnabled: async (enabled: boolean) => {
+        try {
+          // Update backend preference first
+          await invoke('set_startup_enabled', { enabled });
+          
+          // Update frontend state only after successful backend update
+          set({ startupEnabled: enabled });
+        } catch (error) {
+          console.error('Failed to update startup setting in backend:', error);
+          // Don't update frontend state if backend update fails
+          throw error;
+        }
+      },
       initializeSettings: async () => {
         try {
           const state = get();
@@ -309,6 +325,20 @@ export const useSettingsStore = create<SettingsState>()(
               await invoke('set_minimize_behavior', { minimizeToTray: state.minimizeToTray });
             } catch (syncError) {
               console.error('Failed to sync minimize behavior to backend:', syncError);
+            }
+          }
+          
+          // Sync startup preference with backend
+          try {
+            const backendStartupEnabled = await invoke('get_startup_enabled') as boolean;
+            set({ startupEnabled: backendStartupEnabled });
+          } catch (error) {
+            console.error('Failed to sync startup setting from backend:', error);
+            // Use frontend state as fallback and try to sync to backend
+            try {
+              await invoke('set_startup_enabled', { enabled: state.startupEnabled });
+            } catch (syncError) {
+              console.error('Failed to sync startup setting to backend:', syncError);
             }
           }
           
@@ -424,7 +454,8 @@ export const useSettingsStore = create<SettingsState>()(
         themeMode: state.themeMode,
         colors: state.colors,
         isCustomAccentColor: state.isCustomAccentColor,
-        minimizeToTray: state.minimizeToTray
+        minimizeToTray: state.minimizeToTray,
+        startupEnabled: state.startupEnabled
       }),
       merge: (persistedState: any, currentState) => {
         // Deep merge to handle nested properties correctly

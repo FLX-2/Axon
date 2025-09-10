@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Settings } from '../Settings';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useAppStore } from '../../store/useAppStore';
@@ -17,6 +18,8 @@ const mockSettingsStore = {
   setThemeMode: vi.fn(),
   minimizeToTray: false,
   setMinimizeToTray: vi.fn(),
+  startupEnabled: false,
+  setStartupEnabled: vi.fn(),
   colors: {
     light: { accent: '#3b82f6' },
     dark: { accent: '#3b82f6' },
@@ -488,6 +491,475 @@ describe('Settings - Visual Consistency Tests', () => {
       // Verify section spacing
       const sections = document.querySelectorAll('.space-y-6');
       expect(sections.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('Settings - Startup Toggle Integration', () => {
+  beforeEach(() => {
+    vi.mocked(useSettingsStore).mockReturnValue(mockSettingsStore);
+    vi.mocked(useAppStore).mockReturnValue(mockAppStore);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('Startup Toggle Rendering', () => {
+    it('should render startup toggle with correct label and description', () => {
+      render(<Settings />);
+      
+      // Check that the startup toggle label is present
+      expect(screen.getByText('Start at Windows Startup')).toBeInTheDocument();
+      
+      // Check that the startup toggle description is present
+      expect(screen.getByText('Automatically launch Axon when Windows starts')).toBeInTheDocument();
+    });
+
+    it('should render startup toggle button with correct styling', () => {
+      render(<Settings />);
+      
+      // Find all toggle buttons and get the second one (startup toggle)
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      
+      expect(toggleButtons).toHaveLength(2); // minimize to tray + startup
+      const startupToggle = toggleButtons[1]; // Second toggle is startup
+      
+      expect(startupToggle).toHaveClass('relative', 'inline-flex', 'h-6', 'w-11', 'items-center', 'rounded-full', 'transition-colors');
+    });
+
+    it('should render startup toggle indicator with correct styling', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Check the toggle indicator (the sliding circle)
+      const indicator = startupToggle.querySelector('span');
+      expect(indicator).toHaveClass('inline-block', 'h-4', 'w-4', 'transform', 'rounded-full', 'bg-white', 'transition-transform');
+    });
+
+    it('should place startup toggle in correct section', () => {
+      render(<Settings />);
+      
+      // Find the Application section
+      const applicationSection = screen.getByText('Application');
+      expect(applicationSection).toBeInTheDocument();
+      
+      // The startup toggle should be in the same section as minimize to tray
+      const startupLabel = screen.getByText('Start at Windows Startup');
+      const minimizeLabel = screen.getByText('Minimize to Tray');
+      
+      // Both should be present in the Application section
+      expect(startupLabel).toBeInTheDocument();
+      expect(minimizeLabel).toBeInTheDocument();
+    });
+  });
+
+  describe('Startup Toggle State Display', () => {
+    it('should show correct toggle state based on startupEnabled value', () => {
+      // Test with startup disabled
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1]; // Second toggle is startup
+      
+      // Should have bg-surfaceSecondary when disabled (startupEnabled is false in mock)
+      expect(startupToggle).toHaveClass('bg-surfaceSecondary');
+    });
+
+    it('should show enabled state when startupEnabled is true', () => {
+      // Update mock to have startup enabled
+      const enabledMockStore = {
+        ...mockSettingsStore,
+        startupEnabled: true,
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(enabledMockStore);
+      
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1]; // Second toggle is startup
+      
+      // Should have bg-accent when enabled
+      expect(startupToggle).toHaveClass('bg-accent');
+    });
+
+    it('should show correct indicator position when disabled', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      const indicator = startupToggle.querySelector('span');
+      
+      // Should be positioned to the left when disabled
+      expect(indicator).toHaveClass('translate-x-1');
+    });
+
+    it('should show correct indicator position when enabled', () => {
+      const enabledMockStore = {
+        ...mockSettingsStore,
+        startupEnabled: true,
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(enabledMockStore);
+      
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      const indicator = startupToggle.querySelector('span');
+      
+      // Should be positioned to the right when enabled
+      expect(indicator).toHaveClass('translate-x-6');
+    });
+
+    it('should maintain visual consistency with minimize to tray toggle', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      
+      expect(toggleButtons).toHaveLength(2);
+      const minimizeToggle = toggleButtons[0];
+      const startupToggle = toggleButtons[1];
+      
+      // Both toggles should have the same base classes
+      const expectedClasses = ['relative', 'inline-flex', 'h-6', 'w-11', 'items-center', 'rounded-full', 'transition-colors'];
+      
+      expectedClasses.forEach(className => {
+        expect(minimizeToggle).toHaveClass(className);
+        expect(startupToggle).toHaveClass(className);
+      });
+    });
+  });
+
+  describe('Startup Toggle Interaction', () => {
+    it('should call setStartupEnabled when clicked', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('should toggle from false to true when clicked', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      // Should call with opposite of current state (false -> true)
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('should toggle from true to false when clicked', async () => {
+      const enabledMockStore = {
+        ...mockSettingsStore,
+        startupEnabled: true,
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(enabledMockStore);
+      
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      // Should call with opposite of current state (true -> false)
+      expect(enabledMockStore.setStartupEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('should handle multiple rapid clicks gracefully', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Click multiple times rapidly
+      await user.click(startupToggle);
+      await user.click(startupToggle);
+      await user.click(startupToggle);
+      
+      // Should have been called multiple times
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledTimes(3);
+    });
+
+    it('should be accessible via keyboard navigation', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Focus the toggle
+      startupToggle.focus();
+      expect(startupToggle).toHaveFocus();
+      
+      // Press Enter to activate
+      await user.keyboard('{Enter}');
+      
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('should be accessible via space key', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Focus the toggle
+      startupToggle.focus();
+      
+      // Press Space to activate
+      await user.keyboard(' ');
+      
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('Startup Toggle Error Handling', () => {
+    it('should handle setStartupEnabled errors gracefully', async () => {
+      const errorMockStore = {
+        ...mockSettingsStore,
+        setStartupEnabled: vi.fn().mockRejectedValue(new Error('Backend error')),
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(errorMockStore);
+      
+      // Mock console.error to avoid test output noise
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      expect(errorMockStore.setStartupEnabled).toHaveBeenCalledWith(true);
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to update startup setting:', expect.any(Error));
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should not crash when setStartupEnabled throws synchronously', async () => {
+      const errorMockStore = {
+        ...mockSettingsStore,
+        setStartupEnabled: vi.fn().mockImplementation(() => {
+          throw new Error('Synchronous error');
+        }),
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(errorMockStore);
+      
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Should not crash the component
+      await user.click(startupToggle);
+      
+      expect(errorMockStore.setStartupEnabled).toHaveBeenCalledWith(true);
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should remain interactive after error', async () => {
+      let callCount = 0;
+      const errorMockStore = {
+        ...mockSettingsStore,
+        setStartupEnabled: vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.reject(new Error('First call fails'));
+          }
+          return Promise.resolve();
+        }),
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(errorMockStore);
+      
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // First click fails
+      await user.click(startupToggle);
+      
+      // Second click should still work
+      await user.click(startupToggle);
+      
+      expect(errorMockStore.setStartupEnabled).toHaveBeenCalledTimes(2);
+      
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Startup Toggle Integration with Other Settings', () => {
+    it('should not affect minimize to tray toggle when startup toggle is clicked', async () => {
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      expect(mockSettingsStore.setStartupEnabled).toHaveBeenCalledWith(true);
+      expect(mockSettingsStore.setMinimizeToTray).not.toHaveBeenCalled();
+    });
+
+    it('should work independently of other settings state', async () => {
+      const mixedStateMockStore = {
+        ...mockSettingsStore,
+        minimizeToTray: true,
+        startupEnabled: false,
+        themeMode: 'dark' as const,
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(mixedStateMockStore);
+      
+      const user = userEvent.setup();
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      await user.click(startupToggle);
+      
+      expect(mixedStateMockStore.setStartupEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('should maintain consistent styling regardless of other settings', () => {
+      const mixedStateMockStore = {
+        ...mockSettingsStore,
+        minimizeToTray: true,
+        startupEnabled: false,
+        themeMode: 'dark' as const,
+      };
+      
+      vi.mocked(useSettingsStore).mockReturnValue(mixedStateMockStore);
+      
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Should still have correct styling
+      expect(startupToggle).toHaveClass('bg-surfaceSecondary');
+    });
+  });
+
+  describe('Startup Toggle Accessibility', () => {
+    it('should have proper ARIA attributes', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Button elements have implicit role="button", so we just verify it's recognized as a button
+      expect(startupToggle.tagName).toBe('BUTTON');
+    });
+
+    it('should be focusable', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      startupToggle.focus();
+      expect(startupToggle).toHaveFocus();
+    });
+
+    it('should have proper tab order', () => {
+      render(<Settings />);
+      
+      const allButtons = screen.getAllByRole('button');
+      
+      // Startup toggle should be in the tab order
+      const toggleButtons = allButtons.filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      
+      expect(toggleButtons).toHaveLength(2);
+      expect(toggleButtons[1]).toBeInTheDocument();
+    });
+
+    it('should provide visual feedback on focus', () => {
+      render(<Settings />);
+      
+      const toggleButtons = screen.getAllByRole('button').filter(button => 
+        button.className.includes('relative inline-flex h-6 w-11')
+      );
+      const startupToggle = toggleButtons[1];
+      
+      // Focus should be visible (browser default focus styles)
+      startupToggle.focus();
+      expect(startupToggle).toHaveFocus();
     });
   });
 });

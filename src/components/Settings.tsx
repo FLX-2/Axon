@@ -140,6 +140,35 @@ export const Settings: React.FC = () => {
             </div>
             <div className={PATTERNS.settingItem}>
               <div className={PATTERNS.labelWithDescription}>
+                <span className={TYPOGRAPHY.label}>Start at Windows Startup</span>
+                <span className={TYPOGRAPHY.description}>
+                  Automatically launch Axon when Windows starts
+                </span>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    await settings.setStartupEnabled(!settings.startupEnabled);
+                  } catch (error) {
+                    console.error('Failed to update startup setting:', error);
+                    // Could add toast notification here in the future
+                  }
+                }}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${settings.startupEnabled ? 'bg-accent' : 'bg-surfaceSecondary'}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${settings.startupEnabled ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+            </div>
+            <div className={PATTERNS.settingItem}>
+              <div className={PATTERNS.labelWithDescription}>
                 <span className={TYPOGRAPHY.label}>Reset App List</span>
                 <span className={TYPOGRAPHY.description}>
                   Refresh and rebuild the list of available applications

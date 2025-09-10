@@ -41,7 +41,9 @@ use md5;
 use url;
 
 mod app_manager;
+mod startup_manager;
 use app_manager::AppManager;
+use startup_manager::StartupManager;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct AppInfo {
@@ -60,6 +62,7 @@ struct AppSettings {
     is_grid_view: bool,
     categories: std::collections::HashMap<String, String>,
     minimize_to_tray: Option<bool>,
+    startup_enabled: Option<bool>,
 }
 
 // Memory cache for app scanning results
@@ -628,6 +631,7 @@ async fn load_app_settings() -> Result<AppSettings, String> {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
+            startup_enabled: Some(false),
         });
     }
     
@@ -704,6 +708,89 @@ async fn get_minimize_behavior() -> Result<bool, String> {
     
     log_error(&format!("Retrieved minimize behavior: {}", minimize_to_tray));
     Ok(minimize_to_tray)
+}
+
+#[tauri::command]
+async fn set_startup_enabled(enabled: bool) -> Result<(), String> {
+    log_error(&format!("Setting startup enabled to: {}", enabled));
+    
+    // Set the startup registry entry using the startup manager
+    StartupManager::set_startup_enabled(enabled)
+        .map_err(|e| {
+            log_error(&format!("Failed to set startup registry entry: {}", e));
+            e
+        })?;
+    
+    // Load current settings
+    let mut settings = load_app_settings().await?;
+    
+    // Update the startup preference in settings
+    settings.startup_enabled = Some(enabled);
+    
+    // Save the updated settings
+    save_app_settings(settings).await?;
+    
+    log_error(&format!("Startup setting saved successfully: {}", enabled));
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_startup_enabled() -> Result<bool, String> {
+    log_error("Getting startup enabled state");
+    
+    // First check the actual registry state
+    let registry_enabled = StartupManager::get_startup_enabled()
+        .map_err(|e| {
+            log_error(&format!("Failed to get startup state from registry: {}", e));
+            e
+        })?;
+    
+    // Load current settings to sync with registry state
+    let mut settings = load_app_settings().await?;
+    let settings_enabled = settings.startup_enabled.unwrap_or(false);
+    
+    // If there's a mismatch between registry and settings, sync them
+    if registry_enabled != settings_enabled {
+        log_error(&format!("Syncing startup setting: registry={}, settings={}", registry_enabled, settings_enabled));
+        settings.startup_enabled = Some(registry_enabled);
+        save_app_settings(settings).await?;
+    }
+    
+    log_error(&format!("Retrieved startup enabled state: {}", registry_enabled));
+    Ok(registry_enabled)
+}
+
+#[tauri::command]
+async fn is_started_from_startup() -> Result<bool, String> {
+    let started_from_startup = StartupManager::is_started_from_startup();
+    log_error(&format!("App started from startup: {}", started_from_startup));
+    Ok(started_from_startup)
+}
+
+#[tauri::command]
+async fn validate_startup_configuration() -> Result<bool, String> {
+    log_error("Validating startup configuration");
+    
+    // Perform comprehensive startup validation and maintenance
+    StartupManager::perform_startup_maintenance()
+        .map_err(|e| {
+            log_error(&format!("Startup validation failed: {}", e));
+            e
+        })?;
+    
+    // Check if executable path has changed
+    let path_changed = StartupManager::detect_executable_path_change()
+        .map_err(|e| {
+            log_error(&format!("Failed to detect path changes: {}", e));
+            e
+        })?;
+    
+    if path_changed {
+        log_error("Executable path change detected and fixed");
+    }
+    
+    log_error("Startup configuration validation completed");
+    Ok(!path_changed) // Return true if no issues were found
 }
 
 
@@ -870,8 +957,53 @@ fn main() {
                 window.set_decorations(false).unwrap();
                 window.set_always_on_top(false).unwrap();
                 window.set_skip_taskbar(false).unwrap();
-                window.show().unwrap();
-                window.set_focus().unwrap();
+                
+                // Perform startup maintenance to validate and fix any path issues
+                if let Err(e) = StartupManager::perform_startup_maintenance() {
+                    log_error(&format!("Startup maintenance failed: {}", e));
+                }
+
+                // Check if app was started from Windows startup
+                let started_from_startup = StartupManager::is_started_from_startup();
+                log_error(&format!("App started from startup: {}", started_from_startup));
+                
+                if started_from_startup {
+                    // App was started from Windows startup, check minimize-to-tray setting
+                    // Load settings synchronously to check minimize behavior
+                    let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default());
+                    let minimize_to_tray = if let Some(app_dir) = app_dir {
+                        let settings_file = app_dir.join("settings.json");
+                        if settings_file.exists() {
+                            match fs::read_to_string(&settings_file) {
+                                Ok(content) => {
+                                    match serde_json::from_str::<AppSettings>(&content) {
+                                        Ok(settings) => settings.minimize_to_tray.unwrap_or(false),
+                                        Err(_) => false
+                                    }
+                                }
+                                Err(_) => false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    
+                    if minimize_to_tray {
+                        log_error("Started from startup with minimize-to-tray enabled - starting minimized to tray");
+                        // Don't show the window, it will start hidden in the tray
+                    } else {
+                        log_error("Started from startup with minimize-to-tray disabled - showing window normally");
+                        window.show().unwrap();
+                        window.set_focus().unwrap();
+                    }
+                } else {
+                    // Normal startup, always show the window
+                    log_error("Normal startup - showing window");
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                }
 
                 let app_manager = AppManager::new();
                 app_manager.start_file_watcher();
@@ -906,6 +1038,10 @@ fn main() {
                 save_app_settings,
                 set_minimize_behavior,
                 get_minimize_behavior,
+                set_startup_enabled,
+                get_startup_enabled,
+                is_started_from_startup,
+                validate_startup_configuration,
                 handle_window_minimize
             ]);
 
@@ -935,6 +1071,7 @@ mod tests {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None, // Default case
+            startup_enabled: Some(false),
         };
         
         // When minimize_to_tray is None, it should default to false
@@ -953,6 +1090,7 @@ mod tests {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
+            startup_enabled: Some(false),
         };
         
         let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
@@ -970,6 +1108,7 @@ mod tests {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
+            startup_enabled: Some(false),
         };
         
         let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
@@ -987,6 +1126,7 @@ mod tests {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None,
+            startup_enabled: Some(false),
         };
         
         // Should handle None case gracefully and default to false
@@ -1002,10 +1142,45 @@ mod tests {
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
+            startup_enabled: Some(false),
         };
         
         let minimize_to_tray_enabled = settings_enabled.minimize_to_tray.unwrap_or(false);
         assert_eq!(minimize_to_tray_enabled, true);
+    }
+
+    #[test]
+    fn test_startup_settings_integration() {
+        // Test that startup settings are properly integrated with AppSettings
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+            startup_enabled: Some(true),
+        };
+        
+        // Verify startup_enabled field is accessible
+        let startup_enabled = settings.startup_enabled.unwrap_or(false);
+        assert_eq!(startup_enabled, true);
+        
+        // Test default case
+        let default_settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+            startup_enabled: None,
+        };
+        
+        let default_startup = default_settings.startup_enabled.unwrap_or(false);
+        assert_eq!(default_startup, false);
     }
 
     #[test]

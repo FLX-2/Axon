@@ -42,10 +42,12 @@ interface SettingsState {
     black: ThemeColors;
   };
   isCustomAccentColor: boolean;
+  minimizeToTray: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
+  setMinimizeToTray: (enabled: boolean) => Promise<void>;
   initializeSettings: () => Promise<void>;
 }
 
@@ -185,6 +187,7 @@ export const useSettingsStore = create<SettingsState>()(
       themeMode: 'system',
       colors: fixedDefaultColors,
       isCustomAccentColor: false,
+      minimizeToTray: false,
       isDarkMode: false,
       setThemeMode: (mode) => {
         // Save the theme mode in a separate localStorage entry
@@ -278,9 +281,36 @@ export const useSettingsStore = create<SettingsState>()(
           console.error('Failed to reset to system accent color:', error);
         }
       },
+      setMinimizeToTray: async (enabled: boolean) => {
+        try {
+          // Update backend preference first
+          await invoke('set_minimize_behavior', { minimizeToTray: enabled });
+          
+          // Update frontend state only after successful backend update
+          set({ minimizeToTray: enabled });
+        } catch (error) {
+          console.error('Failed to update minimize behavior in backend:', error);
+          // Don't update frontend state if backend update fails
+          throw error;
+        }
+      },
       initializeSettings: async () => {
         try {
           const state = get();
+          
+          // Sync minimize to tray preference with backend
+          try {
+            const backendMinimizeToTray = await invoke('get_minimize_behavior') as boolean;
+            set({ minimizeToTray: backendMinimizeToTray });
+          } catch (error) {
+            console.error('Failed to sync minimize behavior from backend:', error);
+            // Use frontend state as fallback and try to sync to backend
+            try {
+              await invoke('set_minimize_behavior', { minimizeToTray: state.minimizeToTray });
+            } catch (syncError) {
+              console.error('Failed to sync minimize behavior to backend:', syncError);
+            }
+          }
           
           // First check for theme mode backup
           const themeModeBackup = localStorage.getItem(THEME_MODE_BACKUP_KEY);
@@ -393,7 +423,8 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         themeMode: state.themeMode,
         colors: state.colors,
-        isCustomAccentColor: state.isCustomAccentColor
+        isCustomAccentColor: state.isCustomAccentColor,
+        minimizeToTray: state.minimizeToTray
       }),
       merge: (persistedState: any, currentState) => {
         // Deep merge to handle nested properties correctly

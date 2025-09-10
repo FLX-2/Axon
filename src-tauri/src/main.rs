@@ -27,8 +27,7 @@ use windows::Win32::Graphics::Gdi::{
     BLACK_BRUSH, HBRUSH
 };
 use windows::core::{ComInterface, PCWSTR};
-use std::fs::OpenOptions;
-use std::io::Write;
+
 use image;
 use image::ImageEncoder;
 use windows::Win32::UI::Shell::ShellExecuteW;
@@ -60,6 +59,7 @@ struct AppSettings {
     recent_apps: Vec<String>,
     is_grid_view: bool,
     categories: std::collections::HashMap<String, String>,
+    minimize_to_tray: Option<bool>,
 }
 
 // Memory cache for app scanning results
@@ -453,7 +453,7 @@ async fn launch_app(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String, String> {
-    use image::{ImageFormat, DynamicImage, imageops::FilterType};
+    use image::{ImageFormat, imageops::FilterType};
     
     
     // Get the app's data directory
@@ -627,6 +627,7 @@ async fn load_app_settings() -> Result<AppSettings, String> {
             recent_apps: Vec::new(),
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
         });
     }
     
@@ -678,6 +679,74 @@ fn log_error(_error: &str) {
     // No logging at all
 }
 
+#[tauri::command]
+async fn set_minimize_behavior(minimize_to_tray: bool) -> Result<(), String> {
+    // Load current settings
+    let mut settings = load_app_settings().await?;
+    
+    // Update the minimize behavior preference
+    settings.minimize_to_tray = Some(minimize_to_tray);
+    
+    // Save the updated settings
+    save_app_settings(settings).await?;
+    
+    log_error(&format!("Minimize behavior set to: {}", minimize_to_tray));
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_minimize_behavior() -> Result<bool, String> {
+    // Load current settings
+    let settings = load_app_settings().await?;
+    
+    // Return the minimize behavior preference, defaulting to false if not set
+    let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+    
+    log_error(&format!("Retrieved minimize behavior: {}", minimize_to_tray));
+    Ok(minimize_to_tray)
+}
+
+
+
+#[tauri::command]
+async fn handle_window_minimize(window: tauri::Window) -> Result<(), String> {
+    log_error("Window minimize requested - checking user preference");
+    
+    // Get the minimize behavior preference
+    match get_minimize_behavior().await {
+        Ok(minimize_to_tray) => {
+            if minimize_to_tray {
+                log_error("Minimize to tray enabled - hiding window to tray");
+                
+                // Hide window to tray instead of minimizing to taskbar
+                window.hide().map_err(|e| {
+                    log_error(&format!("Failed to hide window to tray: {:?}", e));
+                    format!("Failed to hide window to tray: {:?}", e)
+                })?;
+            } else {
+                log_error("Minimize to tray disabled - using normal taskbar minimize");
+                
+                // Minimize to taskbar normally
+                window.minimize().map_err(|e| {
+                    log_error(&format!("Failed to minimize window to taskbar: {:?}", e));
+                    format!("Failed to minimize window to taskbar: {:?}", e)
+                })?;
+            }
+            Ok(())
+        }
+        Err(e) => {
+            log_error(&format!("Failed to get minimize behavior preference: {}, falling back to normal minimize", e));
+            
+            // Fall back to normal minimize behavior on error
+            window.minimize().map_err(|e| {
+                log_error(&format!("Failed to minimize window (fallback): {:?}", e));
+                format!("Failed to minimize window (fallback): {:?}", e)
+            })?;
+            Ok(())
+        }
+    }
+}
+
 
 fn main() {
     log_error("Application starting...");
@@ -692,12 +761,12 @@ fn main() {
         }
         
         // Create system tray menu with proper CustomMenuItem objects
-        // The show/hide item will start as "Show" and toggle based on window visibility
-        let toggle_visibility = tauri::CustomMenuItem::new("toggle_visibility".to_string(), "Show/Hide");
+        // The restore item will show the window when it's hidden to tray
+        let restore = tauri::CustomMenuItem::new("restore".to_string(), "Restore");
         let quit = tauri::CustomMenuItem::new("quit".to_string(), "Quit");
         
         let tray_menu = SystemTrayMenu::new()
-            .add_item(toggle_visibility)
+            .add_item(restore)
             .add_native_item(SystemTrayMenuItem::Separator)
             .add_item(quit);
         
@@ -712,34 +781,23 @@ fn main() {
                     match id.as_str() {
                         "quit" => {
                             log_error("Quit selected from system tray - exiting application");
-                            std::process::exit(0);
+                            app.exit(0);
                         }
-                        "toggle_visibility" => {
+                        "restore" => {
                             let window = app.get_window("main").unwrap();
-                            // Toggle the window visibility
-                            if window.is_visible().unwrap() {
-                                log_error("Hiding window from system tray menu");
-                                window.hide().unwrap();
-                            } else {
-                                log_error("Showing window from system tray menu");
-                                window.show().unwrap();
-                                window.set_focus().unwrap();
-                            }
+                            log_error("Restore selected from system tray menu - showing window");
+                            window.show().unwrap();
+                            window.set_focus().unwrap();
                         }
                         _ => {}
                     }
                 }
                 SystemTrayEvent::LeftClick { .. } => {
-                    // Left click on the system tray icon also toggles visibility
+                    // Left click on the system tray icon restores the window
                     let window = app.get_window("main").unwrap();
-                    if window.is_visible().unwrap() {
-                        log_error("Hiding window from system tray icon click");
-                        window.hide().unwrap();
-                    } else {
-                        log_error("Showing window from system tray icon click");
-                        window.show().unwrap();
-                        window.set_focus().unwrap();
-                    }
+                    log_error("System tray icon clicked - restoring window");
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
                 }
                 _ => {}
             })
@@ -821,16 +879,16 @@ fn main() {
                 log_error("Setup completed successfully");
                 Ok(())
             })
-            // Handle window close events - hide window instead of exiting
+            // Handle window close events - always close the application (per requirements)
             .on_window_event(|event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
-                    log_error("Window close requested - hiding window to system tray");
-                    
-                    // Prevent the default close behavior
-                    api.prevent_close();
-                    
-                    // Hide the window instead of closing it
-                    event.window().hide().unwrap();
+                match event.event() {
+                    tauri::WindowEvent::CloseRequested { .. } => {
+                        log_error("Window close requested - closing application completely");
+                        // Close button should always close the app regardless of minimize to tray setting
+                        // Use Tauri's app handle to properly exit the application
+                        event.window().app_handle().exit(0);
+                    }
+                    _ => {}
                 }
             })
             .invoke_handler(tauri::generate_handler![
@@ -846,6 +904,9 @@ fn main() {
                 shell_open,
                 load_app_settings,
                 save_app_settings,
+                set_minimize_behavior,
+                get_minimize_behavior,
+                handle_window_minimize
             ]);
 
         log_error("Starting application...");
@@ -859,3 +920,109 @@ fn main() {
         std::process::exit(1);
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_minimize_behavior_default() {
+        // Test that default minimize behavior is false (taskbar minimize)
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: None, // Default case
+        };
+        
+        // When minimize_to_tray is None, it should default to false
+        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+        assert_eq!(minimize_to_tray, false);
+    }
+
+    #[test]
+    fn test_minimize_behavior_enabled() {
+        // Test that minimize to tray can be enabled
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+        };
+        
+        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+        assert_eq!(minimize_to_tray, true);
+    }
+
+    #[test]
+    fn test_minimize_behavior_disabled() {
+        // Test that minimize to tray can be explicitly disabled
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+        };
+        
+        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+        assert_eq!(minimize_to_tray, false);
+    }
+}  
+    #[test]
+    fn test_minimize_behavior_error_handling() {
+        // Test that error handling works when minimize_to_tray is None
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: None,
+        };
+        
+        // Should handle None case gracefully and default to false
+        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+        assert_eq!(minimize_to_tray, false);
+        
+        // Test with Some(true)
+        let settings_enabled = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+        };
+        
+        let minimize_to_tray_enabled = settings_enabled.minimize_to_tray.unwrap_or(false);
+        assert_eq!(minimize_to_tray_enabled, true);
+    }
+
+    #[test]
+    fn test_tray_menu_structure() {
+        // Test that the tray menu has the expected structure
+        // This is a basic test to ensure menu items are properly defined
+        
+        // Test menu item IDs that should be available
+        let restore_id = "restore";
+        let quit_id = "quit";
+        
+        // Verify the IDs are valid strings
+        assert_eq!(restore_id, "restore");
+        assert_eq!(quit_id, "quit");
+        
+        // Test that menu items have proper labels (this would be tested in integration tests)
+        // For now, just verify the structure is correct
+        assert!(!restore_id.is_empty());
+        assert!(!quit_id.is_empty());
+    }

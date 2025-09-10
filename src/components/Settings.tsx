@@ -65,6 +65,35 @@ export const Settings: React.FC = () => {
         <div className="space-y-4">
           <h3 className="text-sm font-medium">Application</h3>
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm text-textPrimary">Minimize to Tray</span>
+                <span className="text-xs text-textSecondary">
+                  When enabled, minimize button will hide the app to system tray instead of taskbar
+                </span>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    await settings.setMinimizeToTray(!settings.minimizeToTray);
+                  } catch (error) {
+                    console.error('Failed to update minimize to tray setting:', error);
+                    // Could add toast notification here in the future
+                  }
+                }}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${settings.minimizeToTray ? 'bg-accent' : 'bg-surfaceSecondary'}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${settings.minimizeToTray ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+            </div>
             <button
               onClick={() => appStore.refreshApps()}
               disabled={isRefreshing}

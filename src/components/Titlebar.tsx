@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Minus, Square } from 'lucide-react';
 import { appWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/tauri';
 
 export const Titlebar: React.FC = () => {
   return (
@@ -14,7 +15,15 @@ export const Titlebar: React.FC = () => {
       </div>
       <div className="flex">
         <button
-          onClick={() => appWindow.minimize()}
+          onClick={async () => {
+            try {
+              await invoke('handle_window_minimize');
+            } catch (error) {
+              console.error('Failed to handle window minimize:', error);
+              // Fallback to default minimize behavior
+              appWindow.minimize();
+            }
+          }}
           className="h-8 w-12 flex items-center justify-center hover:bg-buttonHover"
         >
           <Minus className="w-3.5 h-3.5 text-iconSecondary" />
@@ -26,7 +35,7 @@ export const Titlebar: React.FC = () => {
           <Square className="w-3.5 h-3.5 text-iconSecondary" />
         </button>
         <button
-          onClick={() => appWindow.hide()}
+          onClick={() => appWindow.close()}
           className="h-8 w-12 flex items-center justify-center hover:bg-buttonHover"
         >
           <X className="w-3.5 h-3.5 text-iconSecondary" />

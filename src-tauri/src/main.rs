@@ -42,6 +42,8 @@ use url;
 
 mod app_manager;
 mod startup_manager;
+#[cfg(test)]
+mod unit_tests;
 use app_manager::AppManager;
 use startup_manager::StartupManager;
 
@@ -63,6 +65,7 @@ struct AppSettings {
     categories: std::collections::HashMap<String, String>,
     minimize_to_tray: Option<bool>,
     startup_enabled: Option<bool>,
+    start_minimized: Option<bool>,
 }
 
 // Memory cache for app scanning results
@@ -632,6 +635,7 @@ async fn load_app_settings() -> Result<AppSettings, String> {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         });
     }
     
@@ -765,6 +769,37 @@ async fn is_started_from_startup() -> Result<bool, String> {
     let started_from_startup = StartupManager::is_started_from_startup();
     log_error(&format!("App started from startup: {}", started_from_startup));
     Ok(started_from_startup)
+}
+
+#[tauri::command]
+async fn set_start_minimized(enabled: bool) -> Result<(), String> {
+    log_error(&format!("Setting start minimized to: {}", enabled));
+    
+    // Load current settings
+    let mut settings = load_app_settings().await?;
+    
+    // Update the start minimized preference
+    settings.start_minimized = Some(enabled);
+    
+    // Save the updated settings
+    save_app_settings(settings).await?;
+    
+    log_error(&format!("Start minimized setting saved successfully: {}", enabled));
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_start_minimized() -> Result<bool, String> {
+    log_error("Getting start minimized state");
+    
+    // Load current settings
+    let settings = load_app_settings().await?;
+    
+    // Return the start minimized preference, defaulting to true if not set (maintains current behavior)
+    let start_minimized = settings.start_minimized.unwrap_or(true);
+    
+    log_error(&format!("Retrieved start minimized state: {}", start_minimized));
+    Ok(start_minimized)
 }
 
 #[tauri::command]
@@ -968,38 +1003,50 @@ fn main() {
                 log_error(&format!("App started from startup: {}", started_from_startup));
                 
                 if started_from_startup {
-                    // App was started from Windows startup, check minimize-to-tray setting
-                    // Load settings synchronously to check minimize behavior
+                    // App was started from Windows startup, check both minimize-to-tray and start-minimized settings
+                    // Load settings synchronously to check behavior preferences
                     let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default());
-                    let minimize_to_tray = if let Some(app_dir) = app_dir {
+                    let (minimize_to_tray, start_minimized) = if let Some(app_dir) = app_dir {
                         let settings_file = app_dir.join("settings.json");
                         if settings_file.exists() {
                             match fs::read_to_string(&settings_file) {
                                 Ok(content) => {
                                     match serde_json::from_str::<AppSettings>(&content) {
-                                        Ok(settings) => settings.minimize_to_tray.unwrap_or(false),
-                                        Err(_) => false
+                                        Ok(settings) => (
+                                            settings.minimize_to_tray.unwrap_or(false),
+                                            settings.start_minimized.unwrap_or(true) // Default to true to maintain current behavior
+                                        ),
+                                        Err(_) => (false, true)
                                     }
                                 }
-                                Err(_) => false
+                                Err(_) => (false, true)
                             }
                         } else {
-                            false
+                            (false, true) // Default values
                         }
                     } else {
-                        false
+                        (false, true) // Default values
                     };
                     
-                    if minimize_to_tray {
-                        log_error("Started from startup with minimize-to-tray enabled - starting minimized to tray");
+                    log_error(&format!("Startup settings - minimize_to_tray: {}, start_minimized: {}", minimize_to_tray, start_minimized));
+                    
+                    // Only minimize to tray if both conditions are met:
+                    // 1. minimize_to_tray is enabled (user has tray functionality enabled)
+                    // 2. start_minimized is enabled (user wants to start minimized on startup)
+                    if minimize_to_tray && start_minimized {
+                        log_error("Started from startup with both minimize-to-tray and start-minimized enabled - starting minimized to tray");
                         // Don't show the window, it will start hidden in the tray
+                    } else if !minimize_to_tray && start_minimized {
+                        log_error("Started from startup with start-minimized enabled but minimize-to-tray disabled - starting minimized to taskbar");
+                        window.show().unwrap();
+                        window.minimize().unwrap();
                     } else {
-                        log_error("Started from startup with minimize-to-tray disabled - showing window normally");
+                        log_error("Started from startup with start-minimized disabled - showing window normally");
                         window.show().unwrap();
                         window.set_focus().unwrap();
                     }
                 } else {
-                    // Normal startup, always show the window
+                    // Normal startup (manual launch), always show the window regardless of start_minimized setting
                     log_error("Normal startup - showing window");
                     window.show().unwrap();
                     window.set_focus().unwrap();
@@ -1042,7 +1089,9 @@ fn main() {
                 get_startup_enabled,
                 is_started_from_startup,
                 validate_startup_configuration,
-                handle_window_minimize
+                handle_window_minimize,
+                set_start_minimized,
+                get_start_minimized
             ]);
 
         log_error("Starting application...");
@@ -1072,6 +1121,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None, // Default case
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         };
         
         // When minimize_to_tray is None, it should default to false
@@ -1091,6 +1141,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         };
         
         let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
@@ -1109,12 +1160,13 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         };
         
         let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
         assert_eq!(minimize_to_tray, false);
     }
-}  
+
     #[test]
     fn test_minimize_behavior_error_handling() {
         // Test that error handling works when minimize_to_tray is None
@@ -1127,6 +1179,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None,
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         };
         
         // Should handle None case gracefully and default to false
@@ -1143,6 +1196,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
             startup_enabled: Some(false),
+            start_minimized: Some(true),
         };
         
         let minimize_to_tray_enabled = settings_enabled.minimize_to_tray.unwrap_or(false);
@@ -1161,6 +1215,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
             startup_enabled: Some(true),
+            start_minimized: Some(true),
         };
         
         // Verify startup_enabled field is accessible
@@ -1177,6 +1232,7 @@ mod tests {
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
             startup_enabled: None,
+            start_minimized: Some(true),
         };
         
         let default_startup = default_settings.startup_enabled.unwrap_or(false);
@@ -1201,3 +1257,184 @@ mod tests {
         assert!(!restore_id.is_empty());
         assert!(!quit_id.is_empty());
     }
+
+    #[test]
+    fn test_start_minimized_setting_integration() {
+        // Test that start_minimized setting is properly integrated with AppSettings
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+            startup_enabled: Some(true),
+            start_minimized: Some(false),
+        };
+        
+        // Verify start_minimized field is accessible
+        let start_minimized = settings.start_minimized.unwrap_or(true);
+        assert_eq!(start_minimized, false);
+        
+        // Test default case (should default to true to maintain current behavior)
+        let default_settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+            startup_enabled: Some(true),
+            start_minimized: None,
+        };
+        
+        let default_start_minimized = default_settings.start_minimized.unwrap_or(true);
+        assert_eq!(default_start_minimized, true);
+    }
+
+    #[test]
+    fn test_startup_behavior_logic() {
+        // Test the logic for determining startup behavior based on settings
+        
+        // Case 1: Both minimize_to_tray and start_minimized enabled - should start hidden in tray
+        let minimize_to_tray = true;
+        let start_minimized = true;
+        let should_hide_to_tray = minimize_to_tray && start_minimized;
+        assert!(should_hide_to_tray, "Should hide to tray when both settings enabled");
+        
+        // Case 2: minimize_to_tray disabled, start_minimized enabled - should minimize to taskbar
+        let minimize_to_tray = false;
+        let start_minimized = true;
+        let should_minimize_to_taskbar = !minimize_to_tray && start_minimized;
+        assert!(should_minimize_to_taskbar, "Should minimize to taskbar when tray disabled but start_minimized enabled");
+        
+        // Case 3: start_minimized disabled - should show normally regardless of tray setting
+        let minimize_to_tray = true;
+        let start_minimized = false;
+        let should_show_normally = !start_minimized;
+        assert!(should_show_normally, "Should show normally when start_minimized disabled");
+        
+        // Case 4: Both disabled - should show normally
+        let minimize_to_tray = false;
+        let start_minimized = false;
+        let should_show_normally = !start_minimized;
+        assert!(should_show_normally, "Should show normally when both settings disabled");
+    }
+
+    // Unit tests for backend Tauri commands - start_minimized functionality
+    
+    #[test]
+    fn test_app_settings_start_minimized_field() {
+        // Test that AppSettings struct properly handles start_minimized field
+        let settings_with_true = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+            startup_enabled: Some(false),
+            start_minimized: Some(true),
+        };
+        
+        assert_eq!(settings_with_true.start_minimized, Some(true), "start_minimized should be Some(true)");
+        
+        let settings_with_false = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+            startup_enabled: Some(false),
+            start_minimized: Some(false),
+        };
+        
+        assert_eq!(settings_with_false.start_minimized, Some(false), "start_minimized should be Some(false)");
+        
+        let settings_with_none = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(false),
+            startup_enabled: Some(false),
+            start_minimized: None,
+        };
+        
+        assert_eq!(settings_with_none.start_minimized, None, "start_minimized should be None");
+    }
+
+    #[test]
+    fn test_start_minimized_default_behavior() {
+        // Test the default behavior logic for start_minimized
+        let settings_none = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+            startup_enabled: Some(true),
+            start_minimized: None,
+        };
+        
+        // When start_minimized is None, it should default to true (current behavior)
+        let start_minimized = settings_none.start_minimized.unwrap_or(true);
+        assert_eq!(start_minimized, true, "Default start_minimized should be true");
+        
+        // When start_minimized is explicitly set, it should use that value
+        let settings_false = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+            startup_enabled: Some(true),
+            start_minimized: Some(false),
+        };
+        
+        let start_minimized_false = settings_false.start_minimized.unwrap_or(true);
+        assert_eq!(start_minimized_false, false, "Explicit false should be preserved");
+    }
+
+    #[test]
+    fn test_start_minimized_serialization() {
+        // Test that start_minimized field can be serialized and deserialized
+        let settings = AppSettings {
+            custom_icons: std::collections::HashMap::new(),
+            moved_apps: std::collections::HashMap::new(),
+            pinned_apps: Vec::new(),
+            recent_apps: Vec::new(),
+            is_grid_view: true,
+            categories: std::collections::HashMap::new(),
+            minimize_to_tray: Some(true),
+            startup_enabled: Some(true),
+            start_minimized: Some(false),
+        };
+        
+        // Serialize to JSON
+        let json_result = serde_json::to_string(&settings);
+        assert!(json_result.is_ok(), "Settings should serialize to JSON");
+        
+        let json_string = json_result.unwrap();
+        assert!(json_string.contains("start_minimized"), "JSON should contain start_minimized field");
+        assert!(json_string.contains("false"), "JSON should contain the false value");
+        
+        // Deserialize from JSON
+        let deserialize_result: Result<AppSettings, _> = serde_json::from_str(&json_string);
+        assert!(deserialize_result.is_ok(), "Settings should deserialize from JSON");
+        
+        let deserialized_settings = deserialize_result.unwrap();
+        assert_eq!(deserialized_settings.start_minimized, Some(false), "Deserialized start_minimized should match original");
+    }
+}

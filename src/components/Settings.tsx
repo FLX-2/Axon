@@ -169,6 +169,44 @@ export const Settings: React.FC = () => {
             </div>
             <div className={PATTERNS.settingItem}>
               <div className={PATTERNS.labelWithDescription}>
+                <span className={TYPOGRAPHY.label}>Start Minimized</span>
+                <span className={TYPOGRAPHY.description}>
+                  When enabled, app will start minimized to tray on Windows startup
+                </span>
+              </div>
+              <button
+                onClick={async () => {
+                  // Only allow interaction if both prerequisite settings are enabled
+                  if (!settings.startupEnabled || !settings.minimizeToTray) {
+                    return;
+                  }
+                  
+                  try {
+                    await settings.setStartMinimized(!settings.startMinimized);
+                  } catch (error) {
+                    console.error('Failed to update start minimized setting:', error);
+                    // Could add toast notification here in the future
+                  }
+                }}
+                disabled={!settings.startupEnabled || !settings.minimizeToTray}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${!settings.startupEnabled || !settings.minimizeToTray 
+                    ? 'opacity-70 cursor-not-allowed bg-surfaceSecondary' 
+                    : settings.startMinimized ? 'bg-accent' : 'bg-surfaceSecondary'
+                  }
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${settings.startMinimized && (settings.startupEnabled && settings.minimizeToTray) ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+            </div>
+            <div className={PATTERNS.settingItem}>
+              <div className={PATTERNS.labelWithDescription}>
                 <span className={TYPOGRAPHY.label}>Reset App List</span>
                 <span className={TYPOGRAPHY.description}>
                   Refresh and rebuild the list of available applications

@@ -38,6 +38,11 @@ windows = { version = "0.51.1", features = [
 md5 = "0.7" # Added for hashing
 url = "2.4.1" # Added for URL parsing
 
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+tempfile = "3.8"
+
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!

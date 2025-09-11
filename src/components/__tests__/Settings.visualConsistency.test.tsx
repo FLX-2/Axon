@@ -17,6 +17,10 @@ const mockSettingsStore = {
   setThemeMode: vi.fn(),
   minimizeToTray: false,
   setMinimizeToTray: vi.fn(),
+  startupEnabled: false,
+  setStartupEnabled: vi.fn(),
+  startMinimized: false,
+  setStartMinimized: vi.fn(),
   colors: {
     light: { accent: '#3b82f6' },
     dark: { accent: '#3b82f6' },
@@ -522,6 +526,432 @@ describe('Settings - Comprehensive Visual Consistency Tests', () => {
         const hasStandardSize = icon.classList.contains('w-4') && icon.classList.contains('h-4');
         const hasHeaderSize = icon.classList.contains('w-5') && icon.classList.contains('h-5');
         expect(hasStandardSize || hasHeaderSize).toBe(true);
+      });
+    });
+  });
+
+  describe('Start Minimized Toggle Visual Consistency (Requirements 1.1, 3.1, 3.2, 3.3)', () => {
+    describe('Toggle Appearance Matches Existing Toggles', () => {
+      it('should have identical dimensions to other toggles', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Get all toggle containers
+        const toggleContainers = document.querySelectorAll('.h-6.w-11');
+        expect(toggleContainers.length).toBeGreaterThanOrEqual(3); // Minimize to Tray, Start at Windows Startup, Start Minimized
+        
+        // Verify all toggles have identical dimensions
+        toggleContainers.forEach(toggle => {
+          expect(toggle).toHaveClass('h-6', 'w-11');
+        });
+      });
+
+      it('should have identical styling classes to other toggles', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Get all toggle containers
+        const toggleContainers = document.querySelectorAll('.h-6.w-11');
+        
+        // Verify all toggles have consistent base classes
+        toggleContainers.forEach(toggle => {
+          expect(toggle).toHaveClass(
+            'relative',
+            'inline-flex',
+            'h-6',
+            'w-11', 
+            'items-center',
+            'rounded-full',
+            'transition-colors'
+          );
+        });
+      });
+
+      it('should have identical toggle indicator styling', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Get all toggle indicators
+        const toggleIndicators = document.querySelectorAll('.h-4.w-4.transform.rounded-full.bg-white.transition-transform');
+        expect(toggleIndicators.length).toBeGreaterThanOrEqual(3);
+        
+        // Verify all indicators have identical styling
+        toggleIndicators.forEach(indicator => {
+          expect(indicator).toHaveClass(
+            'inline-block',
+            'h-4',
+            'w-4',
+            'transform',
+            'rounded-full',
+            'bg-white',
+            'transition-transform'
+          );
+        });
+      });
+
+      it('should match active state styling of other toggles', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+          startMinimized: true,
+        });
+
+        render(<Settings />);
+        
+        // Find the Start Minimized toggle by its label
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Find another active toggle for comparison
+        const minimizeToTrayLabel = screen.getByText('Minimize to Tray');
+        const minimizeToTrayToggle = minimizeToTrayLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Both should have accent background when active
+        expect(startMinimizedToggle).toHaveClass('bg-accent');
+        expect(minimizeToTrayToggle).toHaveClass('bg-accent');
+      });
+
+      it('should match inactive state styling of other toggles', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: false,
+          startupEnabled: false,
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        // Find toggles by their labels
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        const minimizeToTrayLabel = screen.getByText('Minimize to Tray');
+        const minimizeToTrayToggle = minimizeToTrayLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Both should have secondary background when inactive
+        expect(startMinimizedToggle).toHaveClass('bg-surfaceSecondary');
+        expect(minimizeToTrayToggle).toHaveClass('bg-surfaceSecondary');
+      });
+    });
+
+    describe('Toggle Positioning and Spacing', () => {
+      it('should be positioned correctly within the Application section', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Find the Application section
+        const applicationSection = screen.getByText('Application');
+        const applicationContainer = applicationSection.closest('.space-y-6');
+        
+        // Verify Start Minimized toggle is within the Application section
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        expect(applicationContainer).toContainElement(startMinimizedLabel);
+      });
+
+      it('should be positioned after "Start at Windows Startup" toggle', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Get all setting items in the Application section
+        const applicationSection = screen.getByText('Application');
+        const applicationContainer = applicationSection.closest('.space-y-6');
+        const settingItems = applicationContainer?.querySelectorAll('.flex.items-center.justify-between.py-2');
+        
+        // Find the positions of the toggles
+        let startupToggleIndex = -1;
+        let startMinimizedToggleIndex = -1;
+        
+        settingItems?.forEach((item, index) => {
+          const labelText = item.querySelector('span')?.textContent;
+          if (labelText === 'Start at Windows Startup') {
+            startupToggleIndex = index;
+          } else if (labelText === 'Start Minimized') {
+            startMinimizedToggleIndex = index;
+          }
+        });
+        
+        // Start Minimized should come after Start at Windows Startup
+        expect(startMinimizedToggleIndex).toBeGreaterThan(startupToggleIndex);
+      });
+
+      it('should have consistent vertical spacing with other setting items', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Find all setting items
+        const settingItems = document.querySelectorAll('.flex.items-center.justify-between.py-2');
+        
+        // Verify all setting items have consistent py-2 spacing
+        settingItems.forEach(item => {
+          expect(item).toHaveClass('py-2');
+        });
+        
+        // Verify Start Minimized has the same spacing
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedItem = startMinimizedLabel.closest('.flex.items-center.justify-between');
+        expect(startMinimizedItem).toHaveClass('py-2');
+      });
+
+      it('should maintain consistent horizontal alignment with other toggles', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: true,
+        });
+
+        render(<Settings />);
+        
+        // Find all setting items with toggles
+        const settingItems = document.querySelectorAll('.flex.items-center.justify-between');
+        
+        // Verify all use justify-between for consistent alignment
+        settingItems.forEach(item => {
+          if (item.querySelector('.h-6.w-11')) { // Has a toggle
+            expect(item).toHaveClass('justify-between');
+          }
+        });
+      });
+    });
+
+    describe('Toggle Behavior in Different Theme Modes', () => {
+      it('should maintain consistent styling in light theme', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          themeMode: 'light',
+          minimizeToTray: true,
+          startupEnabled: true,
+          startMinimized: true,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have accent background when active in light theme
+        expect(startMinimizedToggle).toHaveClass('bg-accent');
+        
+        // Toggle indicator should be positioned correctly
+        const toggleIndicator = startMinimizedToggle?.querySelector('.h-4.w-4.transform');
+        expect(toggleIndicator).toHaveClass('translate-x-6'); // Active position
+      });
+
+      it('should maintain consistent styling in dark theme', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          themeMode: 'dark',
+          minimizeToTray: true,
+          startupEnabled: true,
+          startMinimized: true,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have accent background when active in dark theme
+        expect(startMinimizedToggle).toHaveClass('bg-accent');
+        
+        // Toggle indicator should be positioned correctly
+        const toggleIndicator = startMinimizedToggle?.querySelector('.h-4.w-4.transform');
+        expect(toggleIndicator).toHaveClass('translate-x-6'); // Active position
+      });
+
+      it('should maintain consistent styling in black theme', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          themeMode: 'black',
+          minimizeToTray: true,
+          startupEnabled: true,
+          startMinimized: true,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have accent background when active in black theme
+        expect(startMinimizedToggle).toHaveClass('bg-accent');
+        
+        // Toggle indicator should be positioned correctly
+        const toggleIndicator = startMinimizedToggle?.querySelector('.h-4.w-4.transform');
+        expect(toggleIndicator).toHaveClass('translate-x-6'); // Active position
+      });
+
+      it('should maintain consistent styling in system theme', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          themeMode: 'system',
+          minimizeToTray: true,
+          startupEnabled: true,
+          startMinimized: true,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have accent background when active in system theme
+        expect(startMinimizedToggle).toHaveClass('bg-accent');
+        
+        // Toggle indicator should be positioned correctly
+        const toggleIndicator = startMinimizedToggle?.querySelector('.h-4.w-4.transform');
+        expect(toggleIndicator).toHaveClass('translate-x-6'); // Active position
+      });
+    });
+
+    describe('Disabled State Styling', () => {
+      it('should show disabled styling when "Start at Windows Startup" is disabled', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true,
+          startupEnabled: false, // Disabled
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have disabled styling
+        expect(startMinimizedToggle).toHaveClass('opacity-70', 'cursor-not-allowed', 'bg-surfaceSecondary');
+        expect(startMinimizedToggle).toHaveAttribute('disabled');
+      });
+
+      it('should show disabled styling when "Minimize to Tray" is disabled', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: false, // Disabled
+          startupEnabled: true,
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have disabled styling
+        expect(startMinimizedToggle).toHaveClass('opacity-70', 'cursor-not-allowed', 'bg-surfaceSecondary');
+        expect(startMinimizedToggle).toHaveAttribute('disabled');
+      });
+
+      it('should show disabled styling when both prerequisite settings are disabled', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: false, // Disabled
+          startupEnabled: false, // Disabled
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should have disabled styling
+        expect(startMinimizedToggle).toHaveClass('opacity-70', 'cursor-not-allowed', 'bg-surfaceSecondary');
+        expect(startMinimizedToggle).toHaveAttribute('disabled');
+      });
+
+      it('should be enabled when both prerequisite settings are enabled', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: true, // Enabled
+          startupEnabled: true, // Enabled
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Should NOT have disabled styling
+        expect(startMinimizedToggle).not.toHaveClass('opacity-70', 'cursor-not-allowed');
+        expect(startMinimizedToggle).not.toHaveAttribute('disabled');
+        expect(startMinimizedToggle).toHaveClass('bg-surfaceSecondary'); // Normal inactive state
+      });
+
+      it('should maintain disabled styling consistency with other disabled elements', () => {
+        // Test with refresh button disabled for comparison
+        vi.mocked(useAppStore).mockReturnValue({
+          ...mockAppStore,
+          isLoading: true,
+        });
+
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: false,
+          startupEnabled: false,
+          startMinimized: false,
+        });
+
+        render(<Settings />);
+        
+        // Get disabled Start Minimized toggle
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        
+        // Get disabled refresh button
+        const refreshButton = screen.getByRole('button', { name: /refreshing/i });
+        
+        // Both should have consistent disabled styling
+        expect(startMinimizedToggle).toHaveClass('opacity-70', 'cursor-not-allowed');
+        expect(refreshButton).toHaveClass('opacity-70', 'cursor-not-allowed');
+      });
+
+      it('should show correct toggle indicator position when disabled', () => {
+        vi.mocked(useSettingsStore).mockReturnValue({
+          ...mockSettingsStore,
+          minimizeToTray: false,
+          startupEnabled: false,
+          startMinimized: true, // Would be active if enabled
+        });
+
+        render(<Settings />);
+        
+        const startMinimizedLabel = screen.getByText('Start Minimized');
+        const startMinimizedToggle = startMinimizedLabel.closest('.flex.items-center.justify-between')?.querySelector('.h-6.w-11');
+        const toggleIndicator = startMinimizedToggle?.querySelector('.h-4.w-4.transform');
+        
+        // Should be in inactive position despite startMinimized being true
+        expect(toggleIndicator).toHaveClass('translate-x-1'); // Inactive position
       });
     });
   });

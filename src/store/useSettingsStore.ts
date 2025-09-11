@@ -44,12 +44,14 @@ interface SettingsState {
   isCustomAccentColor: boolean;
   minimizeToTray: boolean;
   startupEnabled: boolean;
+  startMinimized: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
   setMinimizeToTray: (enabled: boolean) => Promise<void>;
   setStartupEnabled: (enabled: boolean) => Promise<void>;
+  setStartMinimized: (enabled: boolean) => Promise<void>;
   initializeSettings: () => Promise<void>;
 }
 
@@ -191,6 +193,7 @@ export const useSettingsStore = create<SettingsState>()(
       isCustomAccentColor: false,
       minimizeToTray: false,
       startupEnabled: false,
+      startMinimized: true,
       isDarkMode: false,
       setThemeMode: (mode) => {
         // Save the theme mode in a separate localStorage entry
@@ -310,6 +313,19 @@ export const useSettingsStore = create<SettingsState>()(
           throw error;
         }
       },
+      setStartMinimized: async (enabled: boolean) => {
+        try {
+          // Update backend preference first
+          await invoke('set_start_minimized', { enabled });
+          
+          // Update frontend state only after successful backend update
+          set({ startMinimized: enabled });
+        } catch (error) {
+          console.error('Failed to update start minimized setting in backend:', error);
+          // Don't update frontend state if backend update fails
+          throw error;
+        }
+      },
       initializeSettings: async () => {
         try {
           const state = get();
@@ -339,6 +355,20 @@ export const useSettingsStore = create<SettingsState>()(
               await invoke('set_startup_enabled', { enabled: state.startupEnabled });
             } catch (syncError) {
               console.error('Failed to sync startup setting to backend:', syncError);
+            }
+          }
+          
+          // Sync start minimized preference with backend
+          try {
+            const backendStartMinimized = await invoke('get_start_minimized') as boolean;
+            set({ startMinimized: backendStartMinimized });
+          } catch (error) {
+            console.error('Failed to sync start minimized setting from backend:', error);
+            // Use frontend state as fallback and try to sync to backend
+            try {
+              await invoke('set_start_minimized', { enabled: state.startMinimized });
+            } catch (syncError) {
+              console.error('Failed to sync start minimized setting to backend:', syncError);
             }
           }
           
@@ -455,7 +485,8 @@ export const useSettingsStore = create<SettingsState>()(
         colors: state.colors,
         isCustomAccentColor: state.isCustomAccentColor,
         minimizeToTray: state.minimizeToTray,
-        startupEnabled: state.startupEnabled
+        startupEnabled: state.startupEnabled,
+        startMinimized: state.startMinimized
       }),
       merge: (persistedState: any, currentState) => {
         // Deep merge to handle nested properties correctly

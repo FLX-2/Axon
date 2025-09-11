@@ -524,7 +524,7 @@ describe('Settings - Startup Toggle Integration', () => {
         button.className.includes('relative inline-flex h-6 w-11')
       );
       
-      expect(toggleButtons).toHaveLength(2); // minimize to tray + startup
+      expect(toggleButtons).toHaveLength(3); // minimize to tray + startup + start minimized
       const startupToggle = toggleButtons[1]; // Second toggle is startup
       
       expect(startupToggle).toHaveClass('relative', 'inline-flex', 'h-6', 'w-11', 'items-center', 'rounded-full', 'transition-colors');
@@ -634,7 +634,7 @@ describe('Settings - Startup Toggle Integration', () => {
         button.className.includes('relative inline-flex h-6 w-11')
       );
       
-      expect(toggleButtons).toHaveLength(2);
+      expect(toggleButtons).toHaveLength(3);
       const minimizeToggle = toggleButtons[0];
       const startupToggle = toggleButtons[1];
       
@@ -945,7 +945,7 @@ describe('Settings - Startup Toggle Integration', () => {
         button.className.includes('relative inline-flex h-6 w-11')
       );
       
-      expect(toggleButtons).toHaveLength(2);
+      expect(toggleButtons).toHaveLength(3);
       expect(toggleButtons[1]).toBeInTheDocument();
     });
 

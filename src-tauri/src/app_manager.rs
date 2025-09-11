@@ -10,7 +10,6 @@ use windows::core::{PCWSTR, ComInterface};
 use std::time::{Duration, SystemTime};
 use std::fs;
 use std::io::{Read, Write};
-use std::fs::OpenOptions;
 
 // Empty logging function that does nothing - completely eliminates logging
 fn log_error(_error: &str) {

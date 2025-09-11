@@ -176,8 +176,8 @@ export const Settings: React.FC = () => {
               </div>
               <button
                 onClick={async () => {
-                  // Only allow interaction if both prerequisite settings are enabled
-                  if (!settings.startupEnabled || !settings.minimizeToTray) {
+                  // Only allow interaction if startup is enabled
+                  if (!settings.startupEnabled) {
                     return;
                   }
                   
@@ -188,10 +188,10 @@ export const Settings: React.FC = () => {
                     // Could add toast notification here in the future
                   }
                 }}
-                disabled={!settings.startupEnabled || !settings.minimizeToTray}
+                disabled={!settings.startupEnabled}
                 className={`
                   relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${!settings.startupEnabled || !settings.minimizeToTray 
+                  ${!settings.startupEnabled 
                     ? 'opacity-70 cursor-not-allowed bg-surfaceSecondary' 
                     : settings.startMinimized ? 'bg-accent' : 'bg-surfaceSecondary'
                   }
@@ -200,7 +200,7 @@ export const Settings: React.FC = () => {
                 <span
                   className={`
                     inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                    ${settings.startMinimized && (settings.startupEnabled && settings.minimizeToTray) ? 'translate-x-6' : 'translate-x-1'}
+                    ${settings.startMinimized && settings.startupEnabled ? 'translate-x-6' : 'translate-x-1'}
                   `}
                 />
               </button>

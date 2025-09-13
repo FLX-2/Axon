@@ -610,27 +610,19 @@ async fn remove_custom_icon(app: tauri::AppHandle, app_path: String) -> Result<S
     let hash = format!("{:x}", hasher.finish());
     let icon_path = custom_icons_dir.join(format!("{}.png", hash));
 
-    println!("[AXON DEBUG] Attempting to remove custom icon for: {}", app_path);
-    println!("[AXON DEBUG] App cache dir: {}", app_cache_dir.display());
-    println!("[AXON DEBUG] Custom icons dir: {}", custom_icons_dir.display());
-    println!("[AXON DEBUG] Hash: {}", hash);
-    println!("[AXON DEBUG] Calculated icon path: {}", icon_path.display());
-    println!("[AXON DEBUG] Icon file exists: {}", icon_path.exists());
+    // Debug logging removed for production
 
     // Remove the icon file if it exists
     if icon_path.exists() {
         match fs::remove_file(&icon_path) {
             Ok(_) => {
-                println!("[AXON DEBUG] Successfully removed custom icon: {}", icon_path.display());
                 Ok(format!("Successfully removed: {}", icon_path.display()))
             }
             Err(e) => {
-                println!("[AXON DEBUG] Failed to remove custom icon {}: {}", icon_path.display(), e);
                 Err(format!("Failed to remove custom icon: {}", e))
             }
         }
     } else {
-        println!("[AXON DEBUG] Custom icon file does not exist: {}", icon_path.display());
         Ok(format!("File does not exist: {}", icon_path.display()))
     }
 }
@@ -724,9 +716,11 @@ async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
     Ok(())
 }
 
-// Enable logging for debugging
-fn log_error(error: &str) {
-    println!("[AXON DEBUG] {}", error);
+// Enable logging for debugging - disabled in release builds
+fn log_error(_error: &str) {
+    // Debug logging disabled for cleaner console output
+    // In release builds, logging is disabled for performance
+    // Previously: #[cfg(debug_assertions)] println!("[AXON DEBUG] {}", error);
 }
 
 #[tauri::command]
@@ -1237,7 +1231,7 @@ fn main() {
                     // App was started from Windows startup, check both minimize-to-tray and start-minimized settings
                     // Use unified preferences manager for consistency
                     let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
-                    let (minimize_to_tray, start_minimized) = if let Some(manager) = &*manager_lock.lock().unwrap() {
+                    let (minimize_to_tray, start_minimized) = if let Some(_manager) = &*manager_lock.lock().unwrap() {
                         // Can't use await in setup function, so we use synchronous access
                         // This will be updated when the preferences manager supports sync access
                         (false, true) // Temporary fallback

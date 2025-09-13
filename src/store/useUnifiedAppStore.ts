@@ -103,8 +103,27 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
   setSearchTerm: (term) => set({ searchTerm: term }),
 
-  toggleView: () => {
-    set((state) => ({ isGridView: !state.isGridView }));
+  toggleView: async () => {
+    const state = get();
+    const newViewMode = !state.isGridView;
+
+    // Update UI state immediately
+    set({ isGridView: newViewMode });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            view_mode: newViewMode ? "grid" : "list"
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update view mode:', error);
+      // Revert UI state on error
+      set({ isGridView: state.isGridView });
+    }
   },
 
   setViewMode: async (isGridView) => {

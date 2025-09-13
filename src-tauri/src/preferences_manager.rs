@@ -340,6 +340,8 @@ impl PreferencesManager {
     pub async fn save_custom_icon(&self, app_path: String, icon_data: Vec<u8>) -> Result<String, String> {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
+        use image::imageops::FilterType;
+        use base64::{engine::general_purpose::STANDARD, Engine};
 
         // Create hash of app path for filename
         let mut hasher = DefaultHasher::new();
@@ -348,13 +350,41 @@ impl PreferencesManager {
         let filename = format!("{:x}.png", hash);
         let icon_path = self.cache_dir.join("custom_icons").join(&filename);
 
-        // Save icon file
-        fs::write(&icon_path, &icon_data)
-            .map_err(|e| format!("Failed to save icon file: {}", e))?;
+        // Load and process the image
+        let img = image::load_from_memory(&icon_data)
+            .map_err(|e| format!("Failed to load image: {}", e))?;
 
-        // Return relative path for storage in preferences
-        let relative_path = format!("custom_icons/{}", filename);
-        Ok(relative_path)
+        // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
+        let resized = img.resize(128, 128, FilterType::Lanczos3);
+
+        // Save as PNG with optimal compression
+        let mut output_buffer = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut output_buffer);
+
+        let encoder = image::codecs::png::PngEncoder::new_with_quality(
+            &mut cursor,
+            image::codecs::png::CompressionType::Best,
+            image::codecs::png::FilterType::Adaptive
+        );
+
+        encoder.write_image(
+            resized.as_rgba8().ok_or("Failed to convert to RGBA8")?,
+            128,
+            128,
+            image::ColorType::Rgba8
+        ).map_err(|e| e.to_string())?;
+
+        // Write the file atomically
+        let temp_path = icon_path.with_extension("tmp");
+        fs::write(&temp_path, &output_buffer)
+            .map_err(|e| format!("Failed to save temporary icon: {}", e))?;
+
+        fs::rename(&temp_path, &icon_path)
+            .map_err(|e| format!("Failed to save icon: {}", e))?;
+
+        // Return the processed image as base64 for immediate UI update
+        let base64_result = format!("data:image/png;base64,{}", STANDARD.encode(&output_buffer));
+        Ok(base64_result)
     }
 
     pub async fn save_custom_icon_from_path(&self, app_path: String, temp_file_path: String) -> Result<String, String> {

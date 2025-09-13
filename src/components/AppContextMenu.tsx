@@ -163,23 +163,29 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
                   const fileInput = document.createElement('input');
                   fileInput.type = 'file';
                   fileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
-                  fileInput.onchange = (e) => {
+                  fileInput.onchange = async (e) => {
                     const file = (e.target as HTMLInputElement).files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = async (e) => {
-                        const dataUrl = e.target?.result as string;
-                        // Extract base64 data from data URL (remove "data:image/...;base64," prefix)
-                        const base64data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-                        
-                        try {
-                          await updateAppIcon(app.path, base64data);
-                          onClose();
-                        } catch (error) {
-                          console.error('Failed to save custom icon:', error);
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        // Read file as ArrayBuffer
+                        const arrayBuffer = await file.arrayBuffer();
+                        const uint8Array = new Uint8Array(arrayBuffer);
+
+                        // Convert to regular array for Tauri
+                        const byteArray = Array.from(uint8Array);
+
+                        // Call backend with byte array instead of base64
+                        const relativePath = await invoke<string>('save_custom_icon_bytes', {
+                          appPath: app.path,
+                          iconBytes: byteArray
+                        });
+
+                        // Update the app icon in the store
+                        updateAppIcon(app.path, relativePath);
+                        onClose();
+                      } catch (error) {
+                        console.error('Failed to save custom icon:', error);
+                      }
                     }
                   };
                   fileInput.click();

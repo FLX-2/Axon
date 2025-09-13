@@ -591,8 +591,8 @@ async fn remove_custom_icon(app_path: String) -> Result<String, String> {
             .map_err(|e| format!("Failed to remove custom icon: {}", e))?;
     }
 
-    // Get the original icon
-    get_app_icon_internal(&app_path)
+    // Get the original icon by calling get_app_icon which handles the path correctly
+    get_app_icon(app_path).await
 }
 
 #[tauri::command]
@@ -923,6 +923,31 @@ async fn save_custom_icon_from_path(app_path: String, temp_file_path: String) ->
 }
 
 #[tauri::command]
+async fn save_custom_icon_bytes(app_path: String, icon_bytes: Vec<u8>) -> Result<String, String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Create a new instance and save the icon
+        let new_manager = manager.clone();
+        let result = new_manager.save_custom_icon(app_path, icon_bytes).await?;
+
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        Ok(result)
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
 async fn validate_startup_configuration() -> Result<bool, String> {
     log_error("Validating startup configuration");
     
@@ -1224,7 +1249,8 @@ fn main() {
                 update_preferences,
                 save_custom_icon_unified,
                 get_custom_icon_path,
-                save_custom_icon_from_path
+                save_custom_icon_from_path,
+                save_custom_icon_bytes
             ]);
 
         log_error("Starting application...");

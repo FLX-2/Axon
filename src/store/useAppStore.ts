@@ -360,19 +360,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCustomIcons = { ...state.customIcons };
 
     if (iconData) {
-      // Save custom icon to backend first
-      try {
-        const relativePath = await invoke('save_custom_icon_unified', {
-          appPath: path,
-          iconData: iconData
-        }) as string;
-
-        newCustomIcons[path] = relativePath;
-      } catch (error) {
-        console.error('Failed to save custom icon:', error);
-        return; // Don't update state if backend save failed
-      }
+      // iconData is already a relative path returned from the backend
+      newCustomIcons[path] = iconData;
     } else {
+      // Reset to original icon
       delete newCustomIcons[path];
     }
 

@@ -113,7 +113,7 @@ export const Settings: React.FC = () => {
               <div className={PATTERNS.labelWithDescription}>
                 <span className={TYPOGRAPHY.label}>Minimize to Tray</span>
                 <span className={TYPOGRAPHY.description}>
-                  When enabled, minimize button will hide the app to system tray instead of taskbar
+                  When enabled, minimizing the app will hide it to system tray instead of taskbar
                 </span>
               </div>
               <button
@@ -171,7 +171,7 @@ export const Settings: React.FC = () => {
               <div className={PATTERNS.labelWithDescription}>
                 <span className={TYPOGRAPHY.label}>Start Minimized</span>
                 <span className={TYPOGRAPHY.description}>
-                  When enabled, app will start minimized to tray on Windows startup
+                  When enabled, app will start minimized on Windows startup
                 </span>
               </div>
               <button

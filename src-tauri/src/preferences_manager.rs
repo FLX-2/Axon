@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tokio::sync::RwLock;
 use image::ImageEncoder;
+use crate::startup_manager::StartupManager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeSettings {
@@ -194,6 +195,8 @@ impl PreferencesManager {
 
     pub async fn update_preferences(&self, updates: serde_json::Value) -> Result<(), String> {
         let mut prefs = self.preferences.write().await;
+        let mut startup_changed = false;
+        let mut new_startup_enabled = prefs.behavior.startup_enabled;
 
         // Apply updates to the preferences
         if let Some(theme) = updates.get("theme") {
@@ -213,6 +216,10 @@ impl PreferencesManager {
                 prefs.behavior.minimize_to_tray = minimize_to_tray;
             }
             if let Some(startup_enabled) = behavior.get("startup_enabled").and_then(|v| v.as_bool()) {
+                if prefs.behavior.startup_enabled != startup_enabled {
+                    startup_changed = true;
+                    new_startup_enabled = startup_enabled;
+                }
                 prefs.behavior.startup_enabled = startup_enabled;
             }
             if let Some(start_minimized) = behavior.get("start_minimized").and_then(|v| v.as_bool()) {
@@ -225,6 +232,10 @@ impl PreferencesManager {
             prefs.behavior.minimize_to_tray = minimize_to_tray;
         }
         if let Some(startup_enabled) = updates.get("startup_enabled").and_then(|v| v.as_bool()) {
+            if prefs.behavior.startup_enabled != startup_enabled {
+                startup_changed = true;
+                new_startup_enabled = startup_enabled;
+            }
             prefs.behavior.startup_enabled = startup_enabled;
         }
         if let Some(start_minimized) = updates.get("start_minimized").and_then(|v| v.as_bool()) {
@@ -282,6 +293,16 @@ impl PreferencesManager {
 
         // Save to disk
         self.save_preferences(&prefs).await?;
+
+        // Handle Windows registry update for startup setting
+        // This must be done after releasing the lock to avoid blocking
+        drop(prefs);
+        
+        if startup_changed {
+            // Update the Windows registry to match the new startup setting
+            StartupManager::set_startup_enabled(new_startup_enabled)
+                .map_err(|e| format!("Failed to update Windows startup registry: {}", e))?;
+        }
 
         Ok(())
     }

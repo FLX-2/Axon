@@ -1213,35 +1213,9 @@ fn main() {
                 log_error(&format!("App started from startup: {}", started_from_startup));
                 
                 if started_from_startup {
-                    // App was started from Windows startup, check both minimize-to-tray and start-minimized settings
-                    // Use unified preferences manager for consistency
-                    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
-                    let (minimize_to_tray, start_minimized) = if let Some(_manager) = &*manager_lock.lock().unwrap() {
-                        // Can't use await in setup function, so we use synchronous access
-                        // This will be updated when the preferences manager supports sync access
-                        (false, true) // Temporary fallback
-                    } else {
-                        // Fallback to defaults if manager not available
-                        (false, true)
-                    };
-                    
-                    log_error(&format!("Startup settings - minimize_to_tray: {}, start_minimized: {}", minimize_to_tray, start_minimized));
-                    
-                    // Only minimize to tray if both conditions are met:
-                    // 1. minimize_to_tray is enabled (user has tray functionality enabled)
-                    // 2. start_minimized is enabled (user wants to start minimized on startup)
-                    if minimize_to_tray && start_minimized {
-                        log_error("Started from startup with both minimize-to-tray and start-minimized enabled - starting minimized to tray");
-                        // Don't show the window, it will start hidden in the tray
-                    } else if !minimize_to_tray && start_minimized {
-                        log_error("Started from startup with start-minimized enabled but minimize-to-tray disabled - starting minimized to taskbar");
-                        window.show().unwrap();
-                        window.minimize().unwrap();
-                    } else {
-                        log_error("Started from startup with start-minimized disabled - showing window normally");
-                        window.show().unwrap();
-                        window.set_focus().unwrap();
-                    }
+                    // App was started from Windows startup, need to check settings after preferences manager is initialized
+                    // For now, we'll defer the startup behavior logic to after the preferences manager is set up
+                    log_error("App started from startup - will apply startup behavior after preferences are loaded");
                 } else {
                     // Normal startup (manual launch), always show the window regardless of start_minimized setting
                     log_error("Normal startup - showing window");
@@ -1254,7 +1228,35 @@ fn main() {
                     .map_err(|e| format!("Failed to initialize preferences manager: {}", e))?;
 
                 let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
-                *manager_lock.lock().unwrap() = Some(preferences_manager);
+                *manager_lock.lock().unwrap() = Some(preferences_manager.clone());
+
+                // Now handle startup behavior with proper preferences access
+                if started_from_startup {
+                    // Use a blocking task to read preferences synchronously
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    let preferences = rt.block_on(preferences_manager.get_preferences());
+                    
+                    let minimize_to_tray = preferences.behavior.minimize_to_tray;
+                    let start_minimized = preferences.behavior.start_minimized;
+                    
+                    log_error(&format!("Startup settings - minimize_to_tray: {}, start_minimized: {}", minimize_to_tray, start_minimized));
+                    
+                    // Apply startup behavior based on user preferences
+                    if start_minimized {
+                        if minimize_to_tray {
+                            log_error("Started from startup with both minimize-to-tray and start-minimized enabled - starting hidden in tray");
+                            // Don't show the window, it will start hidden in the tray
+                        } else {
+                            log_error("Started from startup with start-minimized enabled but minimize-to-tray disabled - starting minimized to taskbar");
+                            window.show().unwrap();
+                            window.minimize().unwrap();
+                        }
+                    } else {
+                        log_error("Started from startup with start-minimized disabled - showing window normally");
+                        window.show().unwrap();
+                        window.set_focus().unwrap();
+                    }
+                }
 
                 let app_manager = AppManager::new();
                 app_manager.start_file_watcher();

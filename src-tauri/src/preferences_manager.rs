@@ -357,6 +357,14 @@ impl PreferencesManager {
         // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
         let resized = img.resize(128, 128, FilterType::Lanczos3);
 
+        // Ensure the image is in RGBA8 format
+        let rgba_image = if resized.color() == image::ColorType::Rgba8 {
+            resized
+        } else {
+            // Convert to RGBA8 if it's not already
+            image::DynamicImage::ImageRgba8(resized.to_rgba8())
+        };
+
         // Save as PNG with optimal compression
         let mut output_buffer = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut output_buffer);
@@ -368,7 +376,7 @@ impl PreferencesManager {
         );
 
         encoder.write_image(
-            resized.as_rgba8().ok_or("Failed to convert to RGBA8")?,
+            rgba_image.as_bytes(),
             128,
             128,
             image::ColorType::Rgba8
@@ -410,6 +418,14 @@ impl PreferencesManager {
         // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
         let resized = img.resize(128, 128, FilterType::Lanczos3);
 
+        // Ensure the image is in RGBA8 format
+        let rgba_image = if resized.color() == image::ColorType::Rgba8 {
+            resized
+        } else {
+            // Convert to RGBA8 if it's not already
+            image::DynamicImage::ImageRgba8(resized.to_rgba8())
+        };
+
         // Save as PNG with optimal compression
         let mut output_buffer = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut output_buffer);
@@ -421,7 +437,7 @@ impl PreferencesManager {
         );
 
         encoder.write_image(
-            resized.as_rgba8().ok_or("Failed to convert to RGBA8")?,
+            rgba_image.as_bytes(),
             128,
             128,
             image::ColorType::Rgba8

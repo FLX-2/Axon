@@ -1,143 +1,163 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
 import { open as openFolder } from '@tauri-apps/api/shell';
 import { FolderInfo } from '../types/folder';
-import { storageManager } from '../lib/storageManager';
 
 interface FolderState {
   folders: FolderInfo[];
   addFolder: () => Promise<void>;
   openFolder: (path: string) => Promise<void>;
   removeFolder: (path: string) => void;
-  updateFolderIcon: (path: string, iconData: string) => void;
+  updateFolderIcon: (path: string, iconData: string | null) => Promise<void>;
   getFolder: (path: string) => FolderInfo | undefined;
+  initializeFolders: () => Promise<void>;
 }
 
-// Custom storage adapter for unified storage
-const createUnifiedStorage = () => ({
-  getItem: (name: string): string | null => {
+// Default folders for quick access - only show folders that actually exist
+const getDefaultFolders = (): FolderInfo[] => {
+  const possibleFolders = [
+    { name: "Documents", path: "C:\\Users\\${username}\\Documents" },
+    { name: "Downloads", path: "C:\\Users\\${username}\\Downloads" },
+    { name: "Pictures", path: "C:\\Users\\${username}\\Pictures" },
+    { name: "Music", path: "C:\\Users\\${username}\\Music" },
+    { name: "Videos", path: "C:\\Users\\${username}\\Videos" }
+  ];
+
+  // For now, return empty array to avoid showing non-existent folders
+  // In a future update, we could check if these paths exist
+  return [];
+};
+
+export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
+  folders: getDefaultFolders(),
+
+  addFolder: async () => {
     try {
-      const value = storageManager.get(name);
-      return typeof value === 'string' ? value : null;
-    } catch (e) {
-      console.error('Error getting from unified storage:', e);
-      return null;
-    }
-  },
-  setItem: (name: string, value: string) => {
-    try {
-      storageManager.set(name, value);
-    } catch (e) {
-      console.error('Error saving to unified storage:', e);
-    }
-  },
-  removeItem: (name: string) => {
-    try {
-      storageManager.delete(name);
-    } catch (e) {
-      console.error('Error removing from unified storage:', e);
-    }
-  }
-});
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Folder'
+      });
 
-// Default folders for quick access
-const getDefaultFolders = (): FolderInfo[] => [
-  {
-    name: "Documents",
-    path: "C:\\Users\\User\\Documents"
-  },
-  {
-    name: "Downloads",
-    path: "C:\\Users\\User\\Downloads"
-  },
-  {
-    name: "Pictures",
-    path: "C:\\Users\\User\\Pictures"
-  },
-  {
-    name: "Music",
-    path: "C:\\Users\\User\\Music"
-  },
-  {
-    name: "Videos",
-    path: "C:\\Users\\User\\Videos"
-  }
-];
+      if (selected && !Array.isArray(selected)) {
+        const name = selected.split('\\').pop() || selected;
 
-export const useUnifiedFolderStore = create<FolderState>()(
-  persist(
-    (set, get) => ({
-      folders: getDefaultFolders(),
+        // Check if folder already exists
+        const state = get();
+        const exists = state.folders.some(folder => folder.path === selected);
 
-      addFolder: async () => {
-        try {
-          const selected = await open({
-            directory: true,
-            multiple: false,
-            title: 'Select Folder'
-          });
+        if (!exists) {
+          const newFolders = [...state.folders, { name, path: selected }];
 
-          if (selected && !Array.isArray(selected)) {
-            const name = selected.split('\\').pop() || selected;
+          // Update UI state immediately
+          set({ folders: newFolders });
 
-            // Check if folder already exists
-            const state = get();
-            const exists = state.folders.some(folder => folder.path === selected);
-
-            if (!exists) {
-              set((state) => ({
-                folders: [...state.folders, { name, path: selected }]
-              }));
-            }
+          // Send to backend
+          try {
+            await invoke('update_preferences', {
+              updates: {
+                folders: {
+                  custom_folders: newFolders.filter(folder =>
+                    !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
+                  )
+                }
+              }
+            });
+          } catch (error) {
+            console.error('Failed to update folders:', error);
+            // Revert UI state on error
+            set({ folders: state.folders });
           }
-        } catch (error) {
-          console.error('Failed to add folder:', error);
         }
-      },
-
-      openFolder: async (path: string) => {
-        try {
-          await openFolder(path);
-        } catch (error) {
-          console.error('Failed to open folder:', error);
-        }
-      },
-
-      removeFolder: (path: string) => {
-        set((state) => ({
-          folders: state.folders.filter(folder => folder.path !== path)
-        }));
-      },
-
-      updateFolderIcon: (path: string, iconData: string) => {
-        set((state) => ({
-          folders: state.folders.map(folder =>
-            folder.path === path
-              ? { ...folder, icon: iconData }
-              : folder
-          )
-        }));
-      },
-
-      getFolder: (path: string) => {
-        return get().folders.find(folder => folder.path === path);
       }
-    }),
-    {
-      name: 'folders',
-      storage: createJSONStorage(createUnifiedStorage),
-      partialize: (state) => ({
-        folders: state.folders
-      }),
-      merge: (persistedState: any, currentState) => {
-        // If no persisted state, use current state
-        if (!persistedState) {
-          return currentState;
-        }
+    } catch (error) {
+      console.error('Failed to add folder:', error);
+    }
+  },
 
-        // Merge persisted folders with defaults, avoiding duplicates
-        const persistedFolders = persistedState.folders || [];
+  openFolder: async (path: string) => {
+    try {
+      await openFolder(path);
+    } catch (error) {
+      console.error('Failed to open folder:', error);
+    }
+  },
+
+  removeFolder: (path: string) => {
+    const state = get();
+    const newFolders = state.folders.filter(folder => folder.path !== path);
+
+    // Update UI state immediately
+    set({ folders: newFolders });
+
+    // Send to backend
+    invoke('update_preferences', {
+      updates: {
+        folders: {
+          custom_folders: newFolders.filter(folder =>
+            !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
+          )
+        }
+      }
+    }).catch(error => {
+      console.error('Failed to update folders:', error);
+      // Revert UI state on error
+      set({ folders: state.folders });
+    });
+  },
+
+  updateFolderIcon: async (path: string, iconData: string | null) => {
+    const state = get();
+    const newFolders = state.folders.map(folder =>
+      folder.path === path
+        ? { ...folder, icon: iconData || undefined }
+        : folder
+    );
+
+    if (iconData === null) {
+      // Reset to default icon - also remove the file from disk
+      try {
+        await invoke('remove_custom_folder_icon', { folderPath: path });
+      } catch (fileError) {
+        console.warn('Failed to remove custom folder icon file:', fileError);
+        // Continue with the reset even if file removal fails
+      }
+    }
+
+    // Update UI state immediately
+    set({ folders: newFolders });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          folders: {
+            custom_folders: newFolders.filter(folder =>
+              !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
+            )
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update folder icons:', error);
+      // Revert UI state on error
+      set({ folders: state.folders });
+    }
+  },
+
+  getFolder: (path: string) => {
+    return get().folders.find(folder => folder.path === path);
+  },
+
+  initializeFolders: async () => {
+    try {
+      // Load preferences from backend
+      const prefs = await invoke('get_preferences') as any;
+
+      // Update UI state with loaded folder preferences
+      if (prefs.folders?.custom_folders) {
+        const customFolders = prefs.folders.custom_folders;
         const defaultFolders = getDefaultFolders();
 
         // Create a map of existing folders by path
@@ -148,16 +168,16 @@ export const useUnifiedFolderStore = create<FolderState>()(
           folderMap.set(folder.path, folder);
         });
 
-        // Add or override with persisted folders
-        persistedFolders.forEach((folder: FolderInfo) => {
+        // Add or override with custom folders
+        customFolders.forEach((folder: FolderInfo) => {
           folderMap.set(folder.path, folder);
         });
 
-        return {
-          ...currentState,
-          folders: Array.from(folderMap.values())
-        };
-      },
+        set({ folders: Array.from(folderMap.values()) });
+      }
+    } catch (error) {
+      console.error('Failed to initialize folders:', error);
+      // Keep default state on error
     }
-  )
-);
+  },
+}));

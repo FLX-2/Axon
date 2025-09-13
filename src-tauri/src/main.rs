@@ -490,9 +490,17 @@ async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String,
     // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
     let resized = img.resize(128, 128, FilterType::Lanczos3);
 
+    // Ensure the image is in RGBA8 format
+    let rgba_image = if resized.color() == image::ColorType::Rgba8 {
+        resized
+    } else {
+        // Convert to RGBA8 if it's not already
+        image::DynamicImage::ImageRgba8(resized.to_rgba8())
+    };
+
     // Save as PNG with optimal compression
     let mut output_buffer = Vec::new();
-    resized.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
+    rgba_image.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
         .map_err(|e| format!("Failed to encode image: {}", e))?;
 
     // Write the file atomically
@@ -538,9 +546,17 @@ async fn save_custom_folder_icon(folder_path: String, icon_data: String) -> Resu
     // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
     let resized = img.resize(128, 128, FilterType::Lanczos3);
 
+    // Ensure the image is in RGBA8 format
+    let rgba_image = if resized.color() == image::ColorType::Rgba8 {
+        resized
+    } else {
+        // Convert to RGBA8 if it's not already
+        image::DynamicImage::ImageRgba8(resized.to_rgba8())
+    };
+
     // Save as PNG with optimal compression
     let mut output_buffer = Vec::new();
-    resized.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
+    rgba_image.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
         .map_err(|e| format!("Failed to encode image: {}", e))?;
 
     // Write the file atomically
@@ -576,23 +592,47 @@ async fn remove_custom_folder_icon(folder_path: String) -> Result<String, String
 }
 
 #[tauri::command]
-async fn remove_custom_icon(app_path: String) -> Result<String, String> {
-    // Get the app's data directory
-    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
-        .ok_or_else(|| "Failed to get app directory".to_string())?;
-    
-    let custom_icons_dir = app_data_dir.join("custom_icons");
-    let hash = format!("{:x}", md5::compute(&app_path));
+async fn remove_custom_icon(app: tauri::AppHandle, app_path: String) -> Result<String, String> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    // Get the app's cache directory using the app handle (same as PreferencesManager)
+    let app_cache_dir = app
+        .path_resolver()
+        .app_cache_dir()
+        .ok_or_else(|| "Failed to get app cache directory".to_string())?;
+
+    let custom_icons_dir = app_cache_dir.join("custom_icons");
+
+    // Use the same hash algorithm as PreferencesManager
+    let mut hasher = DefaultHasher::new();
+    app_path.hash(&mut hasher);
+    let hash = format!("{:x}", hasher.finish());
     let icon_path = custom_icons_dir.join(format!("{}.png", hash));
+
+    println!("[AXON DEBUG] Attempting to remove custom icon for: {}", app_path);
+    println!("[AXON DEBUG] App cache dir: {}", app_cache_dir.display());
+    println!("[AXON DEBUG] Custom icons dir: {}", custom_icons_dir.display());
+    println!("[AXON DEBUG] Hash: {}", hash);
+    println!("[AXON DEBUG] Calculated icon path: {}", icon_path.display());
+    println!("[AXON DEBUG] Icon file exists: {}", icon_path.exists());
 
     // Remove the icon file if it exists
     if icon_path.exists() {
-        fs::remove_file(&icon_path)
-            .map_err(|e| format!("Failed to remove custom icon: {}", e))?;
+        match fs::remove_file(&icon_path) {
+            Ok(_) => {
+                println!("[AXON DEBUG] Successfully removed custom icon: {}", icon_path.display());
+                Ok(format!("Successfully removed: {}", icon_path.display()))
+            }
+            Err(e) => {
+                println!("[AXON DEBUG] Failed to remove custom icon {}: {}", icon_path.display(), e);
+                Err(format!("Failed to remove custom icon: {}", e))
+            }
+        }
+    } else {
+        println!("[AXON DEBUG] Custom icon file does not exist: {}", icon_path.display());
+        Ok(format!("File does not exist: {}", icon_path.display()))
     }
-
-    // Get the original icon by calling get_app_icon which handles the path correctly
-    get_app_icon(app_path).await
 }
 
 #[tauri::command]
@@ -684,36 +724,72 @@ async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
     Ok(())
 }
 
-// Empty logging function that does nothing - completely eliminates logging
-fn log_error(_error: &str) {
-    // No logging at all
+// Enable logging for debugging
+fn log_error(error: &str) {
+    println!("[AXON DEBUG] {}", error);
 }
 
 #[tauri::command]
 async fn set_minimize_behavior(minimize_to_tray: bool) -> Result<(), String> {
-    // Load current settings
-    let mut settings = load_app_settings().await?;
-    
-    // Update the minimize behavior preference
-    settings.minimize_to_tray = Some(minimize_to_tray);
-    
-    // Save the updated settings
-    save_app_settings(settings).await?;
-    
-    log_error(&format!("Minimize behavior set to: {}", minimize_to_tray));
-    Ok(())
+    // Use unified preferences manager for consistency
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Create a new instance and update it
+        let new_manager = manager.clone();
+        let mut preferences = new_manager.get_preferences().await;
+        preferences.behavior.minimize_to_tray = minimize_to_tray;
+        new_manager.update_preferences(serde_json::json!({
+            "minimize_to_tray": minimize_to_tray
+        })).await?;
+
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        log_error(&format!("Minimize behavior set to: {} (unified)", minimize_to_tray));
+        Ok(())
+    } else {
+        log_error("Preferences manager not available, falling back to old settings");
+        // Fallback to old settings for backward compatibility
+        let mut settings = load_app_settings().await?;
+        settings.minimize_to_tray = Some(minimize_to_tray);
+        save_app_settings(settings).await?;
+        log_error(&format!("Minimize behavior set to: {} (old)", minimize_to_tray));
+        Ok(())
+    }
 }
 
 #[tauri::command]
 async fn get_minimize_behavior() -> Result<bool, String> {
-    // Load current settings
-    let settings = load_app_settings().await?;
-    
-    // Return the minimize behavior preference, defaulting to false if not set
-    let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
-    
-    log_error(&format!("Retrieved minimize behavior: {}", minimize_to_tray));
-    Ok(minimize_to_tray)
+    // Use unified preferences manager for consistency
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        let preferences = manager.get_preferences().await;
+        let minimize_to_tray = preferences.behavior.minimize_to_tray;
+        log_error(&format!("Retrieved minimize behavior from unified settings: {}", minimize_to_tray));
+        Ok(minimize_to_tray)
+    } else {
+        log_error("Preferences manager not available, falling back to old settings");
+        // Fallback to old settings for backward compatibility
+        let settings = load_app_settings().await?;
+        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
+        log_error(&format!("Retrieved minimize behavior from old settings: {}", minimize_to_tray));
+        Ok(minimize_to_tray)
+    }
 }
 
 #[tauri::command]
@@ -978,39 +1054,49 @@ async fn validate_startup_configuration() -> Result<bool, String> {
 #[tauri::command]
 async fn handle_window_minimize(window: tauri::Window) -> Result<(), String> {
     log_error("Window minimize requested - checking user preference");
-    
-    // Get the minimize behavior preference
-    match get_minimize_behavior().await {
-        Ok(minimize_to_tray) => {
-            if minimize_to_tray {
-                log_error("Minimize to tray enabled - hiding window to tray");
-                
-                // Hide window to tray instead of minimizing to taskbar
-                window.hide().map_err(|e| {
-                    log_error(&format!("Failed to hide window to tray: {:?}", e));
-                    format!("Failed to hide window to tray: {:?}", e)
-                })?;
-            } else {
-                log_error("Minimize to tray disabled - using normal taskbar minimize");
-                
-                // Minimize to taskbar normally
-                window.minimize().map_err(|e| {
-                    log_error(&format!("Failed to minimize window to taskbar: {:?}", e));
-                    format!("Failed to minimize window to taskbar: {:?}", e)
-                })?;
-            }
-            Ok(())
-        }
-        Err(e) => {
-            log_error(&format!("Failed to get minimize behavior preference: {}, falling back to normal minimize", e));
-            
-            // Fall back to normal minimize behavior on error
-            window.minimize().map_err(|e| {
-                log_error(&format!("Failed to minimize window (fallback): {:?}", e));
-                format!("Failed to minimize window (fallback): {:?}", e)
+
+    // Get the minimize behavior preference from unified settings
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        let preferences = manager.get_preferences().await;
+        let minimize_to_tray = preferences.behavior.minimize_to_tray;
+
+        log_error(&format!("Minimize to tray setting: {}", minimize_to_tray));
+
+        if minimize_to_tray {
+            log_error("Minimize to tray enabled - hiding window to tray");
+
+            // Hide window to tray instead of minimizing to taskbar
+            window.hide().map_err(|e| {
+                log_error(&format!("Failed to hide window to tray: {:?}", e));
+                format!("Failed to hide window to tray: {:?}", e)
             })?;
-            Ok(())
+        } else {
+            log_error("Minimize to tray disabled - using normal taskbar minimize");
+
+            // Minimize to taskbar normally
+            window.minimize().map_err(|e| {
+                log_error(&format!("Failed to minimize window to taskbar: {:?}", e));
+                format!("Failed to minimize window to taskbar: {:?}", e)
+            })?;
         }
+        Ok(())
+    } else {
+        log_error("Preferences manager not initialized, falling back to normal minimize");
+
+        // Fall back to normal minimize behavior if manager not available
+        window.minimize().map_err(|e| {
+            log_error(&format!("Failed to minimize window (fallback): {:?}", e));
+            format!("Failed to minimize window (fallback): {:?}", e)
+        })?;
+        Ok(())
     }
 }
 
@@ -1149,28 +1235,15 @@ fn main() {
                 
                 if started_from_startup {
                     // App was started from Windows startup, check both minimize-to-tray and start-minimized settings
-                    // Load settings synchronously to check behavior preferences
-                    let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default());
-                    let (minimize_to_tray, start_minimized) = if let Some(app_dir) = app_dir {
-                        let settings_file = app_dir.join("settings.json");
-                        if settings_file.exists() {
-                            match fs::read_to_string(&settings_file) {
-                                Ok(content) => {
-                                    match serde_json::from_str::<AppSettings>(&content) {
-                                        Ok(settings) => (
-                                            settings.minimize_to_tray.unwrap_or(false),
-                                            settings.start_minimized.unwrap_or(true) // Default to true to maintain current behavior
-                                        ),
-                                        Err(_) => (false, true)
-                                    }
-                                }
-                                Err(_) => (false, true)
-                            }
-                        } else {
-                            (false, true) // Default values
-                        }
+                    // Use unified preferences manager for consistency
+                    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+                    let (minimize_to_tray, start_minimized) = if let Some(manager) = &*manager_lock.lock().unwrap() {
+                        // Can't use await in setup function, so we use synchronous access
+                        // This will be updated when the preferences manager supports sync access
+                        (false, true) // Temporary fallback
                     } else {
-                        (false, true) // Default values
+                        // Fallback to defaults if manager not available
+                        (false, true)
                     };
                     
                     log_error(&format!("Startup settings - minimize_to_tray: {}, start_minimized: {}", minimize_to_tray, start_minimized));

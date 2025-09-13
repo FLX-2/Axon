@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { AppInfo, AppCategory } from '../types/app';
 import { Play, Pin, Clock } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
@@ -145,14 +145,14 @@ const AppGrid: React.FC<{
 };
 
 export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
-  const { 
-    apps, 
-    searchTerm, 
-    isGridView, 
+  const {
+    apps,
+    searchTerm,
+    isGridView,
     togglePinned,
     updateLastAccessed,
     updateCategory
-  } = useAppStore();
+  } = useUnifiedAppStore();
   
   const handleLaunch = async (path: string) => {
     try {

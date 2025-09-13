@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { useSettingsStore, ThemeMode } from '../store/useSettingsStore';
+import { useUnifiedSettingsStore, ThemeMode } from '../store/useUnifiedSettingsStore';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { themeMode, colors } = useSettingsStore();
+  const { themeMode, colors } = useUnifiedSettingsStore();
 
   const applyTheme = (themeType: ThemeMode | boolean) => {
     // Convert boolean to theme type for backward compatibility

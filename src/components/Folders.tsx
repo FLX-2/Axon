@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Folder, FolderPlus } from 'lucide-react';
 import { dialog } from '@tauri-apps/api';
 import { invoke } from '@tauri-apps/api/tauri';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { FolderContextMenu } from './FolderContextMenu';
-import { useFolderStore } from '../store/useFolderStore';
+import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
 import { FolderInfo } from '../types/folder';
 
 export const Folders: React.FC = () => {
-  const { isGridView } = useAppStore();
-  const { folders, addFolder, removeFolder } = useFolderStore();
+  const { isGridView } = useUnifiedAppStore();
+  const { folders, addFolder, removeFolder } = useUnifiedFolderStore();
   const [contextMenu, setContextMenu] = useState<{
     folder: FolderInfo;
     position: { x: number; y: number };
@@ -17,21 +17,7 @@ export const Folders: React.FC = () => {
 
   const handleAddFolder = async () => {
     try {
-      const selected = await dialog.open({
-        directory: true,
-        multiple: false,
-        title: 'Select Folder'
-      });
-
-      if (selected && typeof selected === 'string') {
-        const folderPath = selected;
-        const folderName = folderPath.split('\\').pop() || folderPath;
-        
-        addFolder({
-          name: folderName,
-          path: folderPath
-        });
-      }
+      await addFolder();
     } catch (error) {
       console.error('Failed to add folder:', error);
     }

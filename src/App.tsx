@@ -5,16 +5,18 @@ import { Settings } from './components/Settings';
 import { Sidebar } from './components/Sidebar';
 import { Folders } from './components/Folders';
 import { ThemeProvider } from './components/ThemeProvider';
-import { useAppStore } from './store/useAppStore';
-import { useSettingsStore } from './store/useSettingsStore';
+import { useUnifiedAppStore } from './store/useUnifiedAppStore';
+import { useUnifiedSettingsStore } from './store/useUnifiedSettingsStore';
+import { useUnifiedFolderStore } from './store/useUnifiedFolderStore';
 import { Titlebar } from './components/Titlebar';
 import { LoadingScreen } from './components/LoadingScreen';
 import { useDelayedLoading } from './hooks/useDelayedLoading';
 
 function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { loadApps, isLoading } = useAppStore();
-  const { initializeSettings } = useSettingsStore();
+  const { loadApps, isLoading } = useUnifiedAppStore();
+  const { initializeSettings } = useUnifiedSettingsStore();
+  const { initializeFolders } = useUnifiedFolderStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // Show loading screen for at least 1.2 seconds for better UX
   const showLoading = useDelayedLoading(isLoading, 1200);
@@ -28,6 +30,7 @@ function App() {
   useEffect(() => {
     loadApps();
     initializeSettings();
+    initializeFolders();
   }, []);
 
   return (

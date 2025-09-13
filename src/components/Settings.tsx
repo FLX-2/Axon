@@ -1,13 +1,13 @@
 import React from 'react';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { PATTERNS, STATES, TYPOGRAPHY, SPACING, HEIGHTS } from '../lib/designTokens';
 
 export const Settings: React.FC = () => {
-  const settings = useSettingsStore();
-  const appStore = useAppStore();
+  const settings = useUnifiedSettingsStore();
+  const appStore = useUnifiedAppStore();
   // Show loading animation for at least 800ms for better UX
   const isRefreshing = useDelayedLoading(appStore.isLoading, 800);
   const {

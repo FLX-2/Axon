@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 
 interface LoadingScreenProps {}
 
@@ -9,12 +9,12 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Get the accent color from the settings store
-  const { colors, themeMode } = useSettingsStore();
+  const { colors, themeMode } = useUnifiedSettingsStore();
   const activeColors = themeMode === 'dark' || themeMode === 'black' ? colors.dark : colors.light;
   const accentColor = activeColors.accent;
-  
+
   // Get the actual loading state
-  const { isLoading } = useAppStore();
+  const { isLoading } = useUnifiedAppStore();
   
   // Simulate progress with acceleration when actual loading completes
   useEffect(() => {

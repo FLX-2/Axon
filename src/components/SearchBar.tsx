@@ -1,9 +1,9 @@
 import React from 'react';
 import { Search, LayoutGrid, List, X } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 
 export const SearchBar: React.FC = () => {
-  const { searchTerm, setSearchTerm, isGridView, setViewMode } = useAppStore();
+  const { searchTerm, setSearchTerm, isGridView, toggleView } = useUnifiedAppStore();
 
   return (
     <div className="p-4 border-b border-border bg-surfaceSecondary flex items-center gap-4">
@@ -27,7 +27,7 @@ export const SearchBar: React.FC = () => {
         )}
       </div>
       <button
-        onClick={() => setViewMode(!isGridView)}
+        onClick={() => toggleView()}
         className="p-2 hover:bg-buttonHover rounded-lg transition-colors"
         title={isGridView ? "Switch to list view" : "Switch to grid view"}
       >

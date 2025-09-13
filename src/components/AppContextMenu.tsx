@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppInfo } from '../types/app';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { useAppStore } from '../store/useAppStore';
+import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 
 interface AppContextMenuProps {
   app: AppInfo;
@@ -21,7 +21,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
   const [showIconMenu, setShowIconMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const categories = ['Games', 'Utilities', 'Media', 'Development', 'Other'];
-  const updateAppIcon = useAppStore(state => state.updateAppIcon);
+  const updateAppIcon = useUnifiedAppStore(state => state.updateAppIcon);
 
   // Calculate if we need to flip the menu direction
   const [menuPosition, setMenuPosition] = useState({ x: position.x, y: position.y });
@@ -74,8 +74,11 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
 
   const handleRemoveIcon = async () => {
     try {
-      const originalIcon = await invoke<string>('remove_custom_icon', { appPath: app.path });
-      updateAppIcon(app.path, originalIcon);
+      // Remove the custom icon file (ignore the return value)
+      await invoke('remove_custom_icon', { appPath: app.path });
+
+      // Reset the icon in the store (pass null to clear custom icon)
+      updateAppIcon(app.path, null);
       onClose();
     } catch (error) {
       console.error('Failed to remove custom icon:', error);

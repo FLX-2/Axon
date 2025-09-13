@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { FolderInfo } from '../types/folder';
 import { invoke } from '@tauri-apps/api/tauri';
-import { useFolderStore } from '../store/useFolderStore';
+import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
 
 interface FolderContextMenuProps {
   folder: FolderInfo;
@@ -19,7 +19,7 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
 }) => {
   const [showIconMenu, setShowIconMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const updateFolderIcon = useFolderStore(state => state.updateFolderIcon);
+  const updateFolderIcon = useUnifiedFolderStore(state => state.updateFolderIcon);
 
   // Calculate if we need to flip the menu direction
   const [menuPosition, setMenuPosition] = useState({ x: position.x, y: position.y });

@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/tauri';
 import { AppInfo } from '../types/app';
 import { loadStartMenuApps, refreshStartMenuApps, getAppIcon } from '../lib/system';
 
-// Helper functions for icon loading and caching
 // Polyfill for requestIdleCallback
 const requestIdleCallback =
   window.requestIdleCallback ||
@@ -12,100 +11,52 @@ const requestIdleCallback =
 // Load icons progressively with priority for visible apps
 const loadIconsProgressively = (
   apps: AppInfo[],
-  state: any,
   updateCallback: (apps: AppInfo[]) => void
 ) => {
   const appsToProcess = [...apps];
   const result = [...apps];
-  
+
   // Process icons in small batches to avoid freezing the UI
   const processBatch = async () => {
     if (appsToProcess.length === 0) return;
-    
+
     // Take first 3 apps from the queue
     const batch = appsToProcess.splice(0, 3);
-    
+
     // Process this batch
     await Promise.all(batch.map(async (app) => {
-      // Skip if we already have a custom icon
-      if (state.customIcons[app.path]) {
+      // Skip if we already have an icon
+      if (app.icon && app.icon !== 'loading') {
         return;
       }
-      
-      // Check cache first
-      const cachedIcon = getIconFromCache(app.path);
-      if (cachedIcon) {
-        const index = result.findIndex(a => a.path === app.path);
-        if (index !== -1) {
-          result[index] = { ...result[index], icon: cachedIcon };
-        }
-        return;
-      }
-      
-      // If not in cache, load from backend
+
+      // Load icon from backend
       try {
         const icon = await getAppIcon(app.path);
         const index = result.findIndex(a => a.path === app.path);
         if (index !== -1) {
           result[index] = { ...result[index], icon: icon as string };
-          saveIconToCache(app.path, icon as string);
         }
       } catch (error) {
         // Silently fail on icon loading errors
+        const index = result.findIndex(a => a.path === app.path);
+        if (index !== -1) {
+          result[index] = { ...result[index], icon: null };
+        }
       }
     }));
-    
+
     // Update UI with latest results
     updateCallback([...result]);
-    
+
     // Process next batch during idle time
     if (appsToProcess.length > 0) {
       requestIdleCallback(() => processBatch());
     }
   };
-  
+
   // Start processing
   processBatch();
-};
-
-// Icon cache management
-const ICON_CACHE_PREFIX = 'app_icon_';
-const ICON_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-const getIconFromCache = (path: string): string | null => {
-  try {
-    const cacheKey = ICON_CACHE_PREFIX + btoa(path);
-    const cachedData = localStorage.getItem(cacheKey);
-    
-    if (!cachedData) return null;
-    
-    const { icon, timestamp } = JSON.parse(cachedData);
-    
-    // Check if cache has expired
-    if (Date.now() - timestamp > ICON_CACHE_EXPIRY) {
-      localStorage.removeItem(cacheKey);
-      return null;
-    }
-    
-    return icon;
-  } catch (error) {
-    // Silent error for cache reads
-    return null;
-  }
-};
-
-const saveIconToCache = (path: string, icon: string): void => {
-  try {
-    const cacheKey = ICON_CACHE_PREFIX + btoa(path);
-    const cacheData = {
-      icon,
-      timestamp: Date.now()
-    };
-    
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-  } catch (error) {
-    // Silent error for cache writes
-  }
 };
 
 interface AppState {
@@ -121,6 +72,7 @@ interface AppState {
   setApps: (apps: AppInfo[]) => void;
   setSearchTerm: (term: string) => void;
   toggleView: () => void;
+  setViewMode: (mode: boolean) => void;
   togglePinned: (path: string) => void;
   updateLastAccessed: (path: string, timestamp: string) => void;
   updateCategory: (path: string, category: AppInfo['category']) => void;
@@ -129,12 +81,13 @@ interface AppState {
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => void;
   moveApp: (path: string, newPath: string) => void;
+  initializeApps: () => Promise<void>;
 }
 
 const initialState = {
   apps: [],
   searchTerm: '',
-  isLoading: true, // Start with loading state true to prevent flash of unloaded content
+  isLoading: true,
   isGridView: true,
   customIcons: {},
   movedApps: {},
@@ -143,79 +96,172 @@ const initialState = {
   categories: {},
 };
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
+export const useAppStore = create<AppState>((set, get) => ({
+  ...initialState,
+
   setApps: (apps) => set({ apps }),
-  
+
   setSearchTerm: (term) => set({ searchTerm: term }),
-  
+
   toggleView: () => {
     set((state) => ({ isGridView: !state.isGridView }));
   },
 
-  togglePinned: (path) => {
-    set((state) => {
-      const isPinned = state.pinnedApps.includes(path);
-      const newPinnedApps = isPinned
-        ? state.pinnedApps.filter(p => p !== path)
-        : [...state.pinnedApps, path];
+  setViewMode: async (isGridView) => {
+    const state = get();
 
-      return {
-        pinnedApps: newPinnedApps,
-        apps: state.apps.map(app => 
-          app.path === path 
-            ? { ...app, isPinned: !isPinned }
-            : app
-        )
-      };
-    });
+    // Update UI state immediately
+    set({ isGridView });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            view_mode: isGridView ? "grid" : "list"
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update view mode:', error);
+      // Revert UI state on error
+      set({ isGridView: state.isGridView });
+    }
   },
 
-  updateLastAccessed: (path, timestamp) => {
-    set((state) => {
-      return {
-        lastAccessed: {
-          ...state.lastAccessed,
-          [path]: timestamp
-        },
-        apps: state.apps.map(app => 
-          app.path === path 
-            ? { ...app, lastAccessed: timestamp } 
-            : app
-        )
-      };
+  togglePinned: async (path) => {
+    const state = get();
+    const isPinned = state.pinnedApps.includes(path);
+    const newPinnedApps = isPinned
+      ? state.pinnedApps.filter(p => p !== path)
+      : [...state.pinnedApps, path];
+
+    // Update UI state immediately
+    set({
+      pinnedApps: newPinnedApps,
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, isPinned: !isPinned }
+          : app
+      )
     });
-  },
 
-  updateCategory: (path, category) => {
-    set((state) => {
-      const newCategories = { ...state.categories };
-      if (category) {
-        newCategories[path] = category;
-      } else {
-        delete newCategories[path];
-      }
-
-      return {
-        categories: newCategories,
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            pinned: newPinnedApps
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update pinned apps:', error);
+      // Revert UI state on error
+      set({
+        pinnedApps: state.pinnedApps,
         apps: state.apps.map(app =>
           app.path === path
-            ? { ...app, category }
+            ? { ...app, isPinned: isPinned }
             : app
         )
-      };
+      });
+    }
+  },
+
+  updateLastAccessed: async (path, timestamp) => {
+    const state = get();
+
+    // Update UI state immediately
+    set({
+      lastAccessed: {
+        ...state.lastAccessed,
+        [path]: timestamp
+      },
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, lastAccessed: timestamp }
+          : app
+      )
     });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            last_accessed: {
+              ...state.lastAccessed,
+              [path]: timestamp
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update last accessed:', error);
+      // Revert UI state on error
+      set({
+        lastAccessed: state.lastAccessed,
+        apps: state.apps.map(app =>
+          app.path === path
+            ? { ...app, lastAccessed: state.lastAccessed[path] }
+            : app
+        )
+      });
+    }
+  },
+
+  updateCategory: async (path, category) => {
+    const state = get();
+    const newCategories = { ...state.categories };
+    if (category) {
+      newCategories[path] = category;
+    } else {
+      delete newCategories[path];
+    }
+
+    // Update UI state immediately
+    set({
+      categories: newCategories,
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, category }
+          : app
+      )
+    });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            categories: newCategories
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update app categories:', error);
+      // Revert UI state on error
+      set({
+        categories: state.categories,
+        apps: state.apps.map(app =>
+          app.path === path
+            ? { ...app, category: state.categories[path] }
+            : app
+        )
+      });
+    }
   },
 
   loadApps: async () => {
     set({ isLoading: true });
     try {
-      // STEP 1: Load app metadata quickly (cached in backend)
+      // First load preferences from backend
+      await get().initializeApps();
+
       const apps = await loadStartMenuApps() as AppInfo[];
       const state = get();
-      
+
       // Apply all saved settings
       const updatedApps = apps.map(newApp => {
         const movedPath = state.movedApps[newApp.path] || newApp.path;
@@ -229,33 +275,31 @@ export const useAppStore = create<AppState>()(
           category,
           isPinned,
           lastAccessed,
-          // Initialize with placeholder icon
-          icon: state.customIcons[movedPath] || null,
+          icon: state.customIcons[movedPath] || 'loading',
         };
       });
-      
-      // STEP 2: Set apps without icons first for immediate display
+
+      // Set apps without icons first for immediate display
       set({ apps: updatedApps, isLoading: false });
-      
-      // STEP 3: Load icons in background with priority for visible apps
+
+      // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(updatedApps, state, (updatedAppsWithIcons) => {
+        loadIconsProgressively(updatedApps, (updatedAppsWithIcons) => {
           set({ apps: updatedAppsWithIcons });
         });
       });
     } catch (error) {
-      // Log to app logger instead of console
+      console.error('Failed to load apps:', error);
       set({ isLoading: false });
     }
   },
-  
+
   refreshApps: async () => {
     set({ isLoading: true });
     try {
-      // STEP 1: Force a fresh scan of start menu apps
       const apps = await refreshStartMenuApps() as AppInfo[];
       const state = get();
-      
+
       // Apply all saved settings
       const updatedApps = apps.map(newApp => {
         const movedPath = state.movedApps[newApp.path] || newApp.path;
@@ -269,48 +313,29 @@ export const useAppStore = create<AppState>()(
           category,
           isPinned,
           lastAccessed,
-          // Initialize with placeholder icon
-          icon: state.customIcons[movedPath] || null,
+          icon: state.customIcons[movedPath] || 'loading',
         };
       });
-      
-      // STEP 2: Set apps without icons first for immediate display
+
+      // Set apps without icons first for immediate display
       set({ apps: updatedApps, isLoading: false });
-      
-      // STEP 3: Load icons in background with priority for visible apps
+
+      // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(updatedApps, state, (updatedAppsWithIcons) => {
+        loadIconsProgressively(updatedApps, (updatedAppsWithIcons) => {
           set({ apps: updatedAppsWithIcons });
         });
       });
     } catch (error) {
-      // Log to app logger instead of console
+      console.error('Failed to refresh apps:', error);
       set({ isLoading: false });
     }
   },
 
   loadAppIcon: async (path: string) => {
     try {
-      // Check if we already have this icon in localStorage cache
-      const cachedIcon = getIconFromCache(path);
-      if (cachedIcon) {
-        set((state) => ({
-          apps: state.apps.map(app =>
-            app.path === path
-              ? { ...app, icon: cachedIcon }
-              : app
-          )
-        }));
-        return;
-      }
-      
-      // If not cached, fetch from backend
       const icon = await getAppIcon(path);
-      
-      // Save to cache
-      saveIconToCache(path, icon as string);
-      
-      // Update app state
+
       set((state) => ({
         apps: state.apps.map(app =>
           app.path === path
@@ -319,61 +344,128 @@ export const useAppStore = create<AppState>()(
         )
       }));
     } catch (error) {
-      // Silently fail on icon loading errors
+      console.error('Failed to load app icon:', error);
+      set((state) => ({
+        apps: state.apps.map(app =>
+          app.path === path
+            ? { ...app, icon: null }
+            : app
+        )
+      }));
     }
   },
 
   updateAppIcon: async (path: string, iconData: string | null) => {
-    set((state) => {
-      const newCustomIcons = { ...state.customIcons };
-      
-      if (iconData) {
-        newCustomIcons[path] = iconData;
-      } else {
-        delete newCustomIcons[path];
-      }
+    const state = get();
+    const newCustomIcons = { ...state.customIcons };
 
-      return {
-        customIcons: newCustomIcons,
+    if (iconData) {
+      // Save custom icon to backend first
+      try {
+        const relativePath = await invoke('save_custom_icon_unified', {
+          appPath: path,
+          iconData: iconData
+        }) as string;
+
+        newCustomIcons[path] = relativePath;
+      } catch (error) {
+        console.error('Failed to save custom icon:', error);
+        return; // Don't update state if backend save failed
+      }
+    } else {
+      delete newCustomIcons[path];
+    }
+
+    // Update UI state
+    set({
+      customIcons: newCustomIcons,
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, icon: iconData }
+          : app
+      )
+    });
+
+    // Update preferences with custom icons mapping
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            custom_icons: newCustomIcons
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update custom icons preferences:', error);
+      // Revert UI state on error
+      set({
+        customIcons: state.customIcons,
         apps: state.apps.map(app =>
           app.path === path
-            ? { ...app, icon: iconData }
+            ? { ...app, icon: state.customIcons[path] || null }
             : app
         )
-      };
-    });
+      });
+    }
   },
 
-  moveApp: (path: string, newPath: string) => {
-    set((state) => {
-      const newMovedApps = { ...state.movedApps };
-      newMovedApps[path] = newPath;
+  moveApp: async (path: string, newPath: string) => {
+    const state = get();
+    const newMovedApps = { ...state.movedApps };
+    newMovedApps[path] = newPath;
 
-      return {
-        movedApps: newMovedApps,
+    // Update UI state immediately
+    set({
+      movedApps: newMovedApps,
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, path: newPath }
+          : app
+      )
+    });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            moved_apps: newMovedApps
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update moved apps:', error);
+      // Revert UI state on error
+      set({
+        movedApps: state.movedApps,
         apps: state.apps.map(app =>
           app.path === path
-            ? { ...app, path: newPath }
+            ? { ...app, path: path }
             : app
         )
-      };
-    });
-  }
-    }),
-    {
-      name: 'axon-app-data',
-      partialize: (state) => ({
-        customIcons: state.customIcons,
-        movedApps: state.movedApps,
-        pinnedApps: state.pinnedApps,
-        lastAccessed: state.lastAccessed,
-        isGridView: state.isGridView,
-        categories: state.categories
-      }),
-      merge: (persistedState: any, currentState) => ({
-        ...currentState,
-        ...persistedState,
-      }),
+      });
     }
-  )
-);
+  },
+
+  initializeApps: async () => {
+    try {
+      // Load preferences from backend
+      const prefs = await invoke('get_preferences') as any;
+
+      // Update UI state with loaded app preferences
+      if (prefs.apps) {
+        set({
+          customIcons: prefs.apps.custom_icons || {},
+          movedApps: prefs.apps.moved_apps || {},
+          pinnedApps: prefs.apps.pinned || [],
+          categories: prefs.apps.categories || {},
+          lastAccessed: prefs.apps.last_accessed || {},
+          isGridView: prefs.apps.view_mode !== 'list'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to initialize apps:', error);
+      // Keep default state on error
+    }
+  },
+}));

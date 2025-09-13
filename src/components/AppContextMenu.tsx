@@ -173,8 +173,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
                         const base64data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
                         
                         try {
-                          const processedIcon = await invoke('save_custom_icon', { appPath: app.path, iconData: base64data });
-                          updateAppIcon(app.path, processedIcon as string);
+                          await updateAppIcon(app.path, base64data);
                           onClose();
                         } catch (error) {
                           console.error('Failed to save custom icon:', error);

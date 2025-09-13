@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/tauri';
 import { getSystemAccentColor } from '../lib/system';
 
@@ -7,34 +6,35 @@ export type ThemeMode = 'light' | 'dark' | 'black' | 'system';
 
 interface ThemeColors {
   // Backgrounds
-  surfacePrimary: string;   // Main background color
-  surfaceSecondary: string; // Secondary surfaces (sidebar, header)
-  surfaceHover: string;     // Hover state for buttons/cards
-  
+  surfacePrimary: string;
+  surfaceSecondary: string;
+  surfaceHover: string;
+
   // Text & Icons - Sidebar
-  sidebarText: string;          // Sidebar text
-  sidebarIcon: string;          // Default sidebar icon
-  sidebarIconHover: string;     // Sidebar icon on hover
-  
+  sidebarText: string;
+  sidebarIcon: string;
+  sidebarIconHover: string;
+
   // Text & Icons - Main Content
-  textPrimary: string;     // Primary content text
-  textSecondary: string;   // Secondary/muted text
-  textPlaceholder: string; // Input placeholder text
-  iconPrimary: string;     // Main content icons
-  iconSecondary: string;   // Secondary icons
-  
+  textPrimary: string;
+  textSecondary: string;
+  textPlaceholder: string;
+  iconPrimary: string;
+  iconSecondary: string;
+
   // UI Elements
-  accent: string;         // Accent color (pins, selected icons)
-  scrollbar: string;      // Scrollbar color
-  scrollbarHover: string; // Scrollbar hover color
-  border: string;         // Border color
-  buttonHover: string;    // Button hover background
-  buttonSelected: string; // Selected button background (sidebar)
-  inputBg: string;        // Input field background
-  inputBorder: string;    // Input field border
+  accent: string;
+  scrollbar: string;
+  scrollbarHover: string;
+  border: string;
+  buttonHover: string;
+  buttonSelected: string;
+  inputBg: string;
+  inputBorder: string;
 }
 
 interface SettingsState {
+  // UI State (no persistence)
   themeMode: ThemeMode;
   colors: {
     light: ThemeColors;
@@ -45,8 +45,9 @@ interface SettingsState {
   minimizeToTray: boolean;
   startupEnabled: boolean;
   startMinimized: boolean;
+
+  // Actions
   setThemeMode: (mode: ThemeMode) => void;
-  isDarkMode: boolean;
   setAccentColor: (color: string) => void;
   resetToSystemAccentColor: () => Promise<void>;
   setMinimizeToTray: (enabled: boolean) => Promise<void>;
@@ -66,14 +67,14 @@ const defaultColors = {
     sidebarText: '#111827',
     sidebarIcon: '#737272',
     sidebarIconHover: '#5b5a5a',
-    
+
     // Text & Icons - Main Content
     textPrimary: '#111827',
     textSecondary: '#6b7280',
     textPlaceholder: '#9ca3af',
     iconPrimary: '#737272',
     iconSecondary: '#737272',
-    
+
     // UI Elements
     accent: '#000000',
     scrollbar: '#e5e7eb',
@@ -89,24 +90,24 @@ const defaultColors = {
     surfacePrimary: '#272626',
     surfaceSecondary: '#202121',
     surfaceHover: '#323232',
-    
+
     // Text & Icons - Sidebar
     sidebarText: '#fefffe',
     sidebarIcon: '#9b9b9a',
     sidebarIconHover: '#fefffe',
-    
+
     // Text & Icons - Main Content
     textPrimary: '#fefffe',
     textSecondary: '#9b9b9a',
     textPlaceholder: '#9b9b9a',
     iconPrimary: '#fefffe',
     iconSecondary: '#9b9b9a',
-    
+
     // UI Elements
-    accent: '#ffffff',        // White accent
-    scrollbar: '#404040',      // Dark gray scrollbar
-    scrollbarHover: '#525252', // Lighter gray on hover
-    buttonSelected: '#454545', // Dark gray button background
+    accent: '#ffffff',
+    scrollbar: '#404040',
+    scrollbarHover: '#525252',
+    buttonSelected: '#454545',
     border: '#2c2d2c',
     buttonHover: '#2c2d2c',
     inputBg: '#323232',
@@ -114,405 +115,193 @@ const defaultColors = {
   },
   black: {
     // Backgrounds - Pure black with very subtle differences
-    surfacePrimary: '#000000',    // Pure black
-    surfaceSecondary: '#0a0a0a',  // Very dark gray (almost black)
-    surfaceHover: '#141414',      // Slightly lighter but still very dark
-    
+    surfacePrimary: '#000000',
+    surfaceSecondary: '#0a0a0a',
+    surfaceHover: '#141414',
+
     // Text & Icons - Sidebar
-    sidebarText: '#ffffff',       // Pure white
-    sidebarIcon: '#8a8a8a',       // Medium gray
-    sidebarIconHover: '#ffffff',  // White on hover
-    
+    sidebarText: '#ffffff',
+    sidebarIcon: '#8a8a8a',
+    sidebarIconHover: '#ffffff',
+
     // Text & Icons - Main Content
-    textPrimary: '#ffffff',       // White text
-    textSecondary: '#8a8a8a',     // Medium gray
-    textPlaceholder: '#666666',   // Darker gray
-    iconPrimary: '#ffffff',       // White icons
-    iconSecondary: '#8a8a8a',     // Gray icons
-    
+    textPrimary: '#ffffff',
+    textSecondary: '#8a8a8a',
+    textPlaceholder: '#666666',
+    iconPrimary: '#ffffff',
+    iconSecondary: '#8a8a8a',
+
     // UI Elements
-    accent: '#ffffff',           // White accent (like dark mode - will be replaced by user color)
-    scrollbar: '#1a1a1a',        // Very dark scrollbar
-    scrollbarHover: '#333333',   // Dark gray on hover
-    buttonSelected: '#222222',   // Very dark button background
-    border: '#1a1a1a',          // Very dark borders
-    buttonHover: '#1a1a1a',     // Very dark hover state
-    inputBg: '#141414',         // Very dark input background
-    inputBorder: '#1a1a1a',     // Very dark input border
+    accent: '#ffffff',
+    scrollbar: '#1a1a1a',
+    scrollbarHover: '#333333',
+    buttonSelected: '#222222',
+    border: '#1a1a1a',
+    buttonHover: '#1a1a1a',
+    inputBg: '#141414',
+    inputBorder: '#1a1a1a',
   },
 };
 
-// Helper for efficient storage
-const createEfficientStorage = () => {
-  return createJSONStorage(() => ({
-    getItem: (name: string) => {
-      try {
-        return localStorage.getItem(name);
-      } catch (e) {
-        console.error('Error getting settings from localStorage:', e);
-        return null;
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  // Default UI state
+  themeMode: 'system',
+  colors: defaultColors,
+  isCustomAccentColor: false,
+  minimizeToTray: false,
+  startupEnabled: false,
+  startMinimized: true,
+
+  setThemeMode: (mode) => {
+    // Update UI state immediately
+    set({ themeMode: mode });
+
+    // Send to backend
+    invoke('update_preferences', {
+      updates: {
+        theme: { mode }
       }
-    },
-    setItem: (name: string, value: unknown) => {
-      try {
-        const serialized = JSON.stringify(value);
-        localStorage.setItem(name, serialized);
-      } catch (e) {
-        console.error('Error saving settings to localStorage:', e);
+    }).catch(error => {
+      console.error('Failed to update theme mode:', error);
+    });
+  },
+
+  setAccentColor: (color: string) => {
+    // Update UI state immediately
+    set({
+      colors: {
+        light: { ...get().colors.light, accent: color },
+        dark: { ...get().colors.dark, accent: color },
+        black: { ...get().colors.black, accent: color },
+      },
+      isCustomAccentColor: true
+    });
+
+    // Send to backend
+    invoke('update_preferences', {
+      updates: {
+        theme: {
+          accent_color: color,
+          use_custom_accent: true
+        }
       }
-    },
-    removeItem: (name: string) => {
-      try {
-        localStorage.removeItem(name);
-      } catch (e) {
-        console.error('Error removing settings from localStorage:', e);
-      }
+    }).catch(error => {
+      console.error('Failed to update accent color:', error);
+    });
+  },
+
+  resetToSystemAccentColor: async () => {
+    try {
+      const accentColor = await getSystemAccentColor() as string;
+
+      // Update UI state
+      set({
+        colors: {
+          light: { ...get().colors.light, accent: accentColor },
+          dark: { ...get().colors.dark, accent: accentColor },
+          black: { ...get().colors.black, accent: accentColor },
+        },
+        isCustomAccentColor: false
+      });
+
+      // Send to backend
+      await invoke('update_preferences', {
+        updates: {
+          theme: {
+            accent_color: null,
+            use_custom_accent: false
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to reset to system accent color:', error);
     }
-  }));
-};
+  },
 
-// Cache keys
-const ACCENT_COLOR_CACHE_KEY = 'system_accent_color_cache';
-const THEME_MODE_BACKUP_KEY = 'axon-theme-mode-backup';
-const CUSTOM_ACCENT_KEY = 'axon-custom-accent';
-const IS_CUSTOM_ACCENT_KEY = 'axon-is-custom-accent'; // New key for flag
-const ACCENT_COLOR_CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
+  setMinimizeToTray: async (enabled: boolean) => {
+    // Update UI state immediately
+    set({ minimizeToTray: enabled });
 
-// Temporary fix for TypeScript types
-const fixedDefaultColors = {
-  light: defaultColors.light,
-  dark: defaultColors.dark,
-  black: defaultColors.black
-};
-
-export const useSettingsStore = create<SettingsState>()(
-  persist(
-    (set, get) => ({
-      themeMode: 'system',
-      colors: fixedDefaultColors,
-      isCustomAccentColor: false,
-      minimizeToTray: false,
-      startupEnabled: false,
-      startMinimized: true,
-      isDarkMode: false,
-      setThemeMode: (mode) => {
-        // Save the theme mode in a separate localStorage entry
-        // as a backup in case the Zustand persist doesn't work properly
-        try {
-          localStorage.setItem(THEME_MODE_BACKUP_KEY, JSON.stringify({
-            mode: mode,
-            timestamp: Date.now()
-          }));
-        } catch (e) {
-          console.error('Error saving theme mode backup:', e);
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          behavior: { minimize_to_tray: enabled }
         }
-        
-        set({ themeMode: mode });
-      },
-      setAccentColor: (color: string) => {
-        // Save the custom accent color in a separate localStorage entry
-        try {
-          // Store the color data
-          localStorage.setItem(CUSTOM_ACCENT_KEY, JSON.stringify({
-            color: color,
-            timestamp: Date.now()
-          }));
-          
-          // Store the flag separately
-          localStorage.setItem(IS_CUSTOM_ACCENT_KEY, 'true');
-        } catch (e) {
-          console.error('Error saving custom accent color backup:', e);
-        }
-        
-        // Update state in Zustand
-        set({
-          colors: {
-            light: {
-              ...get().colors.light,
-              accent: color
-            },
-            dark: {
-              ...get().colors.dark,
-              accent: color
-            },
-            black: {
-              ...get().colors.black,
-              accent: color
-            }
-          },
-          isCustomAccentColor: true
-        });
-      },
-      resetToSystemAccentColor: async () => {
-        try {
-          // Check cache first
-          let accentColor: string;
-          // Remove the custom accent color flag
-          localStorage.removeItem(IS_CUSTOM_ACCENT_KEY);
-          localStorage.removeItem(CUSTOM_ACCENT_KEY);
-          
-          // Get system color from cache
-          const cached = localStorage.getItem(ACCENT_COLOR_CACHE_KEY);
-          
-          if (cached) {
-            const { color, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < ACCENT_COLOR_CACHE_TTL) {
-              accentColor = color;
-            } else {
-              // Cache expired, fetch new
-              accentColor = await getSystemAccentColor() as string;
-              localStorage.setItem(ACCENT_COLOR_CACHE_KEY, JSON.stringify({
-                color: accentColor,
-                timestamp: Date.now()
-              }));
-            }
-          } else {
-            // No cache, fetch new
-            accentColor = await getSystemAccentColor() as string;
-            localStorage.setItem(ACCENT_COLOR_CACHE_KEY, JSON.stringify({
-              color: accentColor,
-              timestamp: Date.now()
-            }));
-          }
-          
-          set((state) => ({
-            colors: {
-              light: { ...state.colors.light, accent: accentColor },
-              dark: { ...state.colors.dark, accent: accentColor },
-              black: { ...state.colors.black, accent: accentColor },
-            },
-            isCustomAccentColor: false
-          }));
-        } catch (error) {
-          console.error('Failed to reset to system accent color:', error);
-        }
-      },
-      setMinimizeToTray: async (enabled: boolean) => {
-        try {
-          // Update backend preference first
-          await invoke('set_minimize_behavior', { minimizeToTray: enabled });
-          
-          // Update frontend state only after successful backend update
-          set({ minimizeToTray: enabled });
-        } catch (error) {
-          console.error('Failed to update minimize behavior in backend:', error);
-          // Don't update frontend state if backend update fails
-          throw error;
-        }
-      },
-      setStartupEnabled: async (enabled: boolean) => {
-        try {
-          // Update backend preference first
-          await invoke('set_startup_enabled', { enabled });
-          
-          // Update frontend state only after successful backend update
-          set({ startupEnabled: enabled });
-        } catch (error) {
-          console.error('Failed to update startup setting in backend:', error);
-          // Don't update frontend state if backend update fails
-          throw error;
-        }
-      },
-      setStartMinimized: async (enabled: boolean) => {
-        try {
-          // Update backend preference first
-          await invoke('set_start_minimized', { enabled });
-          
-          // Update frontend state only after successful backend update
-          set({ startMinimized: enabled });
-        } catch (error) {
-          console.error('Failed to update start minimized setting in backend:', error);
-          // Don't update frontend state if backend update fails
-          throw error;
-        }
-      },
-      initializeSettings: async () => {
-        try {
-          const state = get();
-          
-          // Sync minimize to tray preference with backend
-          try {
-            const backendMinimizeToTray = await invoke('get_minimize_behavior') as boolean;
-            set({ minimizeToTray: backendMinimizeToTray });
-          } catch (error) {
-            console.error('Failed to sync minimize behavior from backend:', error);
-            // Use frontend state as fallback and try to sync to backend
-            try {
-              await invoke('set_minimize_behavior', { minimizeToTray: state.minimizeToTray });
-            } catch (syncError) {
-              console.error('Failed to sync minimize behavior to backend:', syncError);
-            }
-          }
-          
-          // Sync startup preference with backend
-          try {
-            const backendStartupEnabled = await invoke('get_startup_enabled') as boolean;
-            set({ startupEnabled: backendStartupEnabled });
-          } catch (error) {
-            console.error('Failed to sync startup setting from backend:', error);
-            // Use frontend state as fallback and try to sync to backend
-            try {
-              await invoke('set_startup_enabled', { enabled: state.startupEnabled });
-            } catch (syncError) {
-              console.error('Failed to sync startup setting to backend:', syncError);
-            }
-          }
-          
-          // Sync start minimized preference with backend
-          try {
-            const backendStartMinimized = await invoke('get_start_minimized') as boolean;
-            set({ startMinimized: backendStartMinimized });
-          } catch (error) {
-            console.error('Failed to sync start minimized setting from backend:', error);
-            // Use frontend state as fallback and try to sync to backend
-            try {
-              await invoke('set_start_minimized', { enabled: state.startMinimized });
-            } catch (syncError) {
-              console.error('Failed to sync start minimized setting to backend:', syncError);
-            }
-          }
-          
-          // First check for theme mode backup
-          const themeModeBackup = localStorage.getItem(THEME_MODE_BACKUP_KEY);
-          if (themeModeBackup) {
-            try {
-              const { mode } = JSON.parse(themeModeBackup);
-              
-              // Apply the theme mode
-              set({ themeMode: mode });
-            } catch (e) {
-              console.error("Error parsing theme mode backup:", e);
-            }
-          }
-          
-          // Check for our custom accent flag first - this is the most reliable indicator
-          const hasCustomAccent = localStorage.getItem(IS_CUSTOM_ACCENT_KEY) === 'true';
-          
-          if (hasCustomAccent) {
-            // We have a custom accent, get its value
-            const customAccentBackup = localStorage.getItem(CUSTOM_ACCENT_KEY);
-            if (customAccentBackup) {
-              try {
-                const { color } = JSON.parse(customAccentBackup);
-                
-                // Apply this color and set the custom flag
-                set({
-                  colors: {
-                    light: { ...state.colors.light, accent: color },
-                    dark: { ...state.colors.dark, accent: color },
-                    black: { ...state.colors.black, accent: color },
-                  },
-                  isCustomAccentColor: true
-                });
-                return; // Early return since we've found and applied custom color
-              } catch (e) {
-                console.error("Error parsing backup accent color:", e);
-              }
-            }
-          }
-          
-          // If we get here, there was no valid backup, so check the persisted state
-          if (state.isCustomAccentColor) {
-            console.log("Using custom accent color from persisted state");
-            // The custom color should already be in the state, so no need to set anything
-          } else {
-            // Use system color since no custom color is set
-            console.log("Using system accent color");
-            let accentColor: string;
-            
-            // Try to get from cache first
-            const cached = localStorage.getItem(ACCENT_COLOR_CACHE_KEY);
-            if (cached) {
-              try {
-                const { color, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < ACCENT_COLOR_CACHE_TTL) {
-                  accentColor = color;
-                } else {
-                  // Cache expired, fetch new
-                  accentColor = await getSystemAccentColor() as string;
-                  localStorage.setItem(ACCENT_COLOR_CACHE_KEY, JSON.stringify({
-                    color: accentColor,
-                    timestamp: Date.now()
-                  }));
-                }
-              } catch (e) {
-                console.error("Error parsing system accent color cache:", e);
-                accentColor = await getSystemAccentColor() as string;
-              }
-            } else {
-              // No cache, fetch new
-              accentColor = await getSystemAccentColor() as string;
-              localStorage.setItem(ACCENT_COLOR_CACHE_KEY, JSON.stringify({
-                color: accentColor,
-                timestamp: Date.now()
-              }));
-            }
-            
-            set({
-              colors: {
-                light: { ...state.colors.light, accent: accentColor },
-                dark: { ...state.colors.dark, accent: accentColor },
-                black: { ...state.colors.black, accent: accentColor },
-              }
-            });
-          }
-        } catch (error) {
-          console.error('Failed to get system accent color:', error);
-        }
-        
-        // Let's also update our local storage with the current state to ensure consistency
-        try {
-          const state = get();
-          if (state.isCustomAccentColor) {
-            // Save the accent colors to both storages
-            const accentColor = state.colors.light.accent; // Use light theme accent as reference
-            localStorage.setItem(IS_CUSTOM_ACCENT_KEY, 'true');
-            localStorage.setItem(CUSTOM_ACCENT_KEY, JSON.stringify({
-              color: accentColor,
-              timestamp: Date.now()
-            }));
-          }
-        } catch (e) {
-          // Silently fail, this is just extra redundancy
-        }
-      },
-    }),
-    {
-      name: 'axon-settings',
-      storage: createEfficientStorage(),
-      partialize: (state) => ({
-        themeMode: state.themeMode,
-        colors: state.colors,
-        isCustomAccentColor: state.isCustomAccentColor,
-        minimizeToTray: state.minimizeToTray,
-        startupEnabled: state.startupEnabled,
-        startMinimized: state.startMinimized
-      }),
-      merge: (persistedState: any, currentState) => {
-        // Deep merge to handle nested properties correctly
-        const customAccentColor = persistedState.isCustomAccentColor;
-        
-        return {
-          ...currentState,
-          ...persistedState,
-          colors: {
-            light: {
-              ...currentState.colors.light,
-              ...(persistedState.colors?.light || {})
-            },
-            dark: {
-              ...currentState.colors.dark,
-              ...(persistedState.colors?.dark || {})
-            },
-            black: {
-              ...currentState.colors.black,
-              ...(persistedState.colors?.black || {})
-            }
-          },
-          // Explicitly set isCustomAccentColor
-          isCustomAccentColor: customAccentColor
-        };
-      },
+      });
+    } catch (error) {
+      console.error('Failed to update minimize behavior:', error);
+      // Revert UI state on error
+      set({ minimizeToTray: !enabled });
     }
-  )
-);
+  },
+
+  setStartupEnabled: async (enabled: boolean) => {
+    // Update UI state immediately
+    set({ startupEnabled: enabled });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          behavior: { startup_enabled: enabled }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update startup setting:', error);
+      // Revert UI state on error
+      set({ startupEnabled: !enabled });
+    }
+  },
+
+  setStartMinimized: async (enabled: boolean) => {
+    // Update UI state immediately
+    set({ startMinimized: enabled });
+
+    // Send to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          behavior: { start_minimized: enabled }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update start minimized setting:', error);
+      // Revert UI state on error
+      set({ startMinimized: !enabled });
+    }
+  },
+
+  initializeSettings: async () => {
+    try {
+      // Load preferences from backend
+      const prefs = await invoke('get_preferences') as any;
+
+      // Update UI state with loaded preferences
+      set({
+        themeMode: prefs.theme?.mode || 'system',
+        minimizeToTray: prefs.behavior?.minimize_to_tray || false,
+        startupEnabled: prefs.behavior?.startup_enabled || false,
+        startMinimized: prefs.behavior?.start_minimized ?? true,
+        isCustomAccentColor: prefs.theme?.use_custom_accent || false,
+        colors: {
+          light: {
+            ...defaultColors.light,
+            accent: prefs.theme?.accent_color || defaultColors.light.accent
+          },
+          dark: {
+            ...defaultColors.dark,
+            accent: prefs.theme?.accent_color || defaultColors.dark.accent
+          },
+          black: {
+            ...defaultColors.black,
+            accent: prefs.theme?.accent_color || defaultColors.black.accent
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to initialize settings:', error);
+      // Keep default state on error
+    }
+  },
+}));

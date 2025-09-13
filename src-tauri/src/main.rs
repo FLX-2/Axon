@@ -42,10 +42,12 @@ use url;
 
 mod app_manager;
 mod startup_manager;
+mod preferences_manager;
 #[cfg(test)]
 mod unit_tests;
 use app_manager::AppManager;
 use startup_manager::StartupManager;
+use preferences_manager::{PreferencesManager, AppPreferences};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct AppInfo {
@@ -802,6 +804,124 @@ async fn get_start_minimized() -> Result<bool, String> {
     Ok(start_minimized)
 }
 
+// New file system storage commands
+static PREFERENCES_MANAGER: std::sync::OnceLock<std::sync::Mutex<Option<PreferencesManager>>> = std::sync::OnceLock::new();
+
+#[tauri::command]
+async fn get_preferences() -> Result<AppPreferences, String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        Ok(manager.get_preferences().await)
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn update_preferences(updates: serde_json::Value) -> Result<(), String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Create a new instance and update it
+        let new_manager = manager.clone();
+        new_manager.update_preferences(updates).await?;
+
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        Ok(())
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn save_custom_icon_unified(app_path: String, icon_data: String) -> Result<String, String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Decode base64 data
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(&icon_data)
+            .map_err(|e| format!("Failed to decode icon data: {}", e))?;
+
+        // Create a new instance and save the icon
+        let new_manager = manager.clone();
+        let result = new_manager.save_custom_icon(app_path, data).await?;
+
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        Ok(result)
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn get_custom_icon_path(relative_path: String) -> Result<String, String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        let path_buf = manager.get_custom_icon_path(&relative_path).await;
+        Ok(path_buf.to_string_lossy().into_owned())
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+async fn save_custom_icon_from_path(app_path: String, temp_file_path: String) -> Result<String, String> {
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Create a new instance and save the icon
+        let new_manager = manager.clone();
+        let result = new_manager.save_custom_icon_from_path(app_path, temp_file_path).await?;
+
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        Ok(result)
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
+}
+
 #[tauri::command]
 async fn validate_startup_configuration() -> Result<bool, String> {
     log_error("Validating startup configuration");
@@ -1052,6 +1172,13 @@ fn main() {
                     window.set_focus().unwrap();
                 }
 
+                // Initialize preferences manager
+                let preferences_manager = PreferencesManager::new(&app.handle())
+                    .map_err(|e| format!("Failed to initialize preferences manager: {}", e))?;
+
+                let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+                *manager_lock.lock().unwrap() = Some(preferences_manager);
+
                 let app_manager = AppManager::new();
                 app_manager.start_file_watcher();
 
@@ -1091,7 +1218,13 @@ fn main() {
                 validate_startup_configuration,
                 handle_window_minimize,
                 set_start_minimized,
-                get_start_minimized
+                get_start_minimized,
+                // New file system storage commands
+                get_preferences,
+                update_preferences,
+                save_custom_icon_unified,
+                get_custom_icon_path,
+                save_custom_icon_from_path
             ]);
 
         log_error("Starting application...");

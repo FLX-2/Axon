@@ -24,12 +24,16 @@ pub struct BehaviorSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderSettings {
+    pub custom_icons: HashMap<String, String>, // folder_path -> relative_icon_path
+    pub custom_folders: Vec<serde_json::Value>, // custom folder list
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub pinned: Vec<String>,
-    pub recent: Vec<String>,
     pub categories: HashMap<String, String>,
     pub custom_icons: HashMap<String, String>, // app_path -> relative_icon_path
-    pub moved_apps: HashMap<String, String>,
     pub last_accessed: HashMap<String, String>, // app_path -> timestamp
     pub view_mode: String, // "grid" or "list"
 }
@@ -45,6 +49,7 @@ pub struct AppPreferences {
     pub theme: ThemeSettings,
     pub behavior: BehaviorSettings,
     pub apps: AppSettings,
+    pub folders: FolderSettings,
     pub metadata: Metadata,
 }
 
@@ -63,12 +68,14 @@ impl Default for AppPreferences {
             },
             apps: AppSettings {
                 pinned: Vec::new(),
-                recent: Vec::new(),
                 categories: HashMap::new(),
                 custom_icons: HashMap::new(),
-                moved_apps: HashMap::new(),
                 last_accessed: HashMap::new(),
                 view_mode: "grid".to_string(),
+            },
+            folders: FolderSettings {
+                custom_icons: HashMap::new(),
+                custom_folders: Vec::new(),
             },
             metadata: Metadata {
                 schema_version: 1,
@@ -230,23 +237,11 @@ impl PreferencesManager {
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect();
             }
-            if let Some(recent) = apps.get("recent").and_then(|v| v.as_array()) {
-                prefs.apps.recent = recent.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect();
-            }
             if let Some(view_mode) = apps.get("view_mode").and_then(|v| v.as_str()) {
                 prefs.apps.view_mode = view_mode.to_string();
             }
             if let Some(custom_icons) = apps.get("custom_icons").and_then(|v| v.as_object()) {
                 prefs.apps.custom_icons = custom_icons.iter()
-                    .filter_map(|(k, v)| {
-                        v.as_str().map(|s| (k.clone(), s.to_string()))
-                    })
-                    .collect();
-            }
-            if let Some(moved_apps) = apps.get("moved_apps").and_then(|v| v.as_object()) {
-                prefs.apps.moved_apps = moved_apps.iter()
                     .filter_map(|(k, v)| {
                         v.as_str().map(|s| (k.clone(), s.to_string()))
                     })
@@ -265,6 +260,21 @@ impl PreferencesManager {
                         v.as_str().map(|s| (k.clone(), s.to_string()))
                     })
                     .collect();
+            }
+
+        }
+
+        // Handle folders settings as top-level field
+        if let Some(folders) = updates.get("folders").and_then(|v| v.as_object()) {
+            if let Some(custom_icons) = folders.get("custom_icons").and_then(|v| v.as_object()) {
+                prefs.folders.custom_icons = custom_icons.iter()
+                    .filter_map(|(k, v)| {
+                        v.as_str().map(|s| (k.clone(), s.to_string()))
+                    })
+                    .collect();
+            }
+            if let Some(custom_folders) = folders.get("custom_folders").and_then(|v| v.as_array()) {
+                prefs.folders.custom_folders = custom_folders.clone();
             }
         }
 
@@ -354,8 +364,8 @@ impl PreferencesManager {
         let img = image::load_from_memory(&icon_data)
             .map_err(|e| format!("Failed to load image: {}", e))?;
 
-        // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
-        let resized = img.resize(128, 128, FilterType::Lanczos3);
+        // Resize to exactly 128x128 with high-quality filtering
+        let resized = img.resize_exact(128, 128, FilterType::Lanczos3);
 
         // Ensure the image is in RGBA8 format
         let rgba_image = if resized.color() == image::ColorType::Rgba8 {
@@ -415,8 +425,8 @@ impl PreferencesManager {
         let img = image::load_from_memory(&icon_data)
             .map_err(|e| format!("Failed to load image: {}", e))?;
 
-        // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
-        let resized = img.resize(128, 128, FilterType::Lanczos3);
+        // Resize to exactly 128x128 with high-quality filtering
+        let resized = img.resize_exact(128, 128, FilterType::Lanczos3);
 
         // Ensure the image is in RGBA8 format
         let rgba_image = if resized.color() == image::ColorType::Rgba8 {
@@ -463,10 +473,73 @@ impl PreferencesManager {
         self.cache_dir.join(relative_path)
     }
 
+    pub async fn save_custom_folder_icon(&self, folder_path: String, icon_data: Vec<u8>) -> Result<String, String> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        use image::imageops::FilterType;
+        use base64::{engine::general_purpose::STANDARD, Engine};
+
+        // Create hash of folder path for filename
+        let mut hasher = DefaultHasher::new();
+        folder_path.hash(&mut hasher);
+        let hash = hasher.finish();
+        let filename = format!("{:x}.png", hash);
+        let icon_path = self.cache_dir.join("custom_icons").join(&filename);
+
+        // Load and process the image
+        let img = image::load_from_memory(&icon_data)
+            .map_err(|e| format!("Failed to load image: {}", e))?;
+
+        // Resize to exactly 128x128 with high-quality filtering
+        let resized = img.resize_exact(128, 128, FilterType::Lanczos3);
+
+        // Ensure the image is in RGBA8 format
+        let rgba_image = if resized.color() == image::ColorType::Rgba8 {
+            resized
+        } else {
+            // Convert to RGBA8 if it's not already
+            image::DynamicImage::ImageRgba8(resized.to_rgba8())
+        };
+
+        // Save as PNG with optimal compression
+        let mut output_buffer = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut output_buffer);
+
+        let encoder = image::codecs::png::PngEncoder::new_with_quality(
+            &mut cursor,
+            image::codecs::png::CompressionType::Best,
+            image::codecs::png::FilterType::Adaptive
+        );
+
+        encoder.write_image(
+            rgba_image.as_bytes(),
+            128,
+            128,
+            image::ColorType::Rgba8
+        ).map_err(|e| e.to_string())?;
+
+        // Write the file atomically
+        let temp_path = icon_path.with_extension("tmp");
+        fs::write(&temp_path, &output_buffer)
+            .map_err(|e| format!("Failed to save temporary icon: {}", e))?;
+
+        fs::rename(&temp_path, &icon_path)
+            .map_err(|e| format!("Failed to save icon: {}", e))?;
+
+        // Return the processed image as base64 for immediate UI update
+        let base64_result = format!("data:image/png;base64,{}", STANDARD.encode(&output_buffer));
+        Ok(base64_result)
+    }
+
     pub async fn cleanup_old_icons(&self) -> Result<(), String> {
         // Simple cleanup - remove icons not referenced in preferences
         let prefs = self.preferences.read().await;
-        let referenced_icons: std::collections::HashSet<_> = prefs.apps.custom_icons.values().collect();
+        let mut referenced_icons: std::collections::HashSet<_> = prefs.apps.custom_icons.values().collect();
+
+        // Also include folder icons in cleanup
+        for folder_icon in prefs.folders.custom_icons.values() {
+            referenced_icons.insert(folder_icon);
+        }
 
         let icons_dir = self.cache_dir.join("custom_icons");
         if !icons_dir.exists() {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { AppInfo, AppCategory } from '../types/app';
-import { Play, Pin, Clock } from 'lucide-react';
+import { Play, Pin } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { AppContextMenu } from './AppContextMenu';
 
@@ -73,9 +73,9 @@ const AppGrid: React.FC<{
                 </button>
                 
                 <div className="flex-1 flex flex-col items-center justify-center w-full">
-                  {app.icon ? (
-                    <img 
-                      src={app.icon} 
+                  {app.icon && app.icon !== 'loading' ? (
+                    <img
+                      src={app.icon}
                       alt={app.name}
                       className="app-icon w-20 h-20 mb-4"
                     />
@@ -92,9 +92,9 @@ const AppGrid: React.FC<{
             ) : (
               <div className="flex items-center w-full">
                 <div className="flex items-center space-x-3 flex-grow">
-                  {app.icon ? (
-                    <img 
-                      src={app.icon} 
+                  {app.icon && app.icon !== 'loading' ? (
+                    <img
+                      src={app.icon}
                       alt={app.name}
                       className="app-icon w-8 h-8"
                     />
@@ -174,34 +174,9 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     return a.name.localeCompare(b.name);
   });
 
-  // Get recent apps by checking lastAccessed timestamps
-  const recentApps = selectedCategory === null 
-    ? filteredApps
-        .filter(app => app.lastAccessed)
-        .sort((a, b) => {
-          const dateA = new Date(a.lastAccessed || '').getTime();
-          const dateB = new Date(b.lastAccessed || '').getTime();
-          return dateB - dateA;
-        })
-        .slice(0, 5)
-    : [];
 
   return (
     <div className="p-4">
-      {selectedCategory === null && recentApps.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-semibold text-textSecondary mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4" /> Recent
-          </h2>
-          <AppGrid 
-            apps={recentApps}
-            isGridView={isGridView}
-            onPin={togglePinned}
-            onLaunch={handleLaunch}
-            onMove={updateCategory}
-          />
-        </div>
-      )}
 
       <div className="mb-6">
         {!selectedCategory && (

@@ -109,36 +109,52 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
 
   updateFolderIcon: async (path: string, iconData: string | null) => {
     const state = get();
-    const newFolders = state.folders.map(folder =>
-      folder.path === path
-        ? { ...folder, icon: iconData || undefined }
-        : folder
-    );
 
+    // Handle icon reset (same pattern as app store)
     if (iconData === null) {
-      // Reset to default icon - also remove the file from disk
+      // Reset to default icon - remove from both file system and preferences
       try {
-        await invoke('remove_custom_folder_icon', { folderPath: path });
+        const result = await invoke<string>('remove_custom_folder_icon', { folderPath: path });
+        console.log(`Folder icon file removal result: ${result}`);
       } catch (fileError) {
         console.warn('Failed to remove custom folder icon file:', fileError);
         // Continue with the reset even if file removal fails
       }
     }
 
+    const newFolders = state.folders.map(folder =>
+      folder.path === path
+        ? { ...folder, icon: iconData || undefined }
+        : folder
+    );
+
     // Update UI state immediately
     set({ folders: newFolders });
 
     // Send to backend
     try {
-      await invoke('update_preferences', {
-        updates: {
-          folders: {
-            custom_folders: newFolders.filter(folder =>
-              !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
-            )
-          }
+      const updates: any = {
+        folders: {
+          custom_folders: newFolders.filter(folder =>
+            !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
+          )
         }
-      });
+      };
+
+      // Always include custom_icons in updates to handle both setting and resetting
+      const customIcons: Record<string, string> = {};
+
+      // If we have a custom icon, add it to the mapping
+      if (iconData && iconData !== null) {
+        // Calculate hash for the icon filename (same as backend)
+        const hash = btoa(path).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+        customIcons[path] = `custom_icons/${hash}.png`;
+      }
+      // If resetting (iconData is null), customIcons will be empty, effectively removing the mapping
+
+      updates.folders.custom_icons = customIcons;
+
+      await invoke('update_preferences', { updates });
     } catch (error) {
       console.error('Failed to update folder icons:', error);
       // Revert UI state on error
@@ -158,6 +174,7 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
       // Update UI state with loaded folder preferences
       if (prefs.folders?.custom_folders) {
         const customFolders = prefs.folders.custom_folders;
+        const customIcons = prefs.folders.custom_icons || {};
         const defaultFolders = getDefaultFolders();
 
         // Create a map of existing folders by path
@@ -169,8 +186,13 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
         });
 
         // Add or override with custom folders
-        customFolders.forEach((folder: FolderInfo) => {
-          folderMap.set(folder.path, folder);
+        customFolders.forEach((folder: any) => {
+          const folderInfo: FolderInfo = {
+            name: folder.name,
+            path: folder.path,
+            icon: customIcons[folder.path] || folder.icon
+          };
+          folderMap.set(folder.path, folderInfo);
         });
 
         set({ folders: Array.from(folderMap.values()) });

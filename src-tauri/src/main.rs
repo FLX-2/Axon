@@ -60,9 +60,7 @@ struct AppInfo {
 #[derive(Serialize, Deserialize, Debug)]
 struct AppSettings {
     custom_icons: std::collections::HashMap<String, String>,
-    moved_apps: std::collections::HashMap<String, String>,
     pinned_apps: Vec<String>,
-    recent_apps: Vec<String>,
     is_grid_view: bool,
     categories: std::collections::HashMap<String, String>,
     minimize_to_tray: Option<bool>,
@@ -487,8 +485,8 @@ async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String,
     let img = image::load_from_memory(&icon_bytes)
         .map_err(|e| format!("Failed to load image: {}", e))?;
 
-    // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
-    let resized = img.resize(128, 128, FilterType::Lanczos3);
+    // Resize to exactly 128x128 with high-quality filtering
+    let resized = img.resize_exact(128, 128, FilterType::Lanczos3);
 
     // Ensure the image is in RGBA8 format
     let rgba_image = if resized.color() == image::ColorType::Rgba8 {
@@ -518,77 +516,65 @@ async fn save_custom_icon(app_path: String, icon_data: String) -> Result<String,
 
 #[tauri::command]
 async fn save_custom_folder_icon(folder_path: String, icon_data: String) -> Result<String, String> {
-    use image::{ImageFormat, imageops::FilterType};
-    
-    // Get the app's data directory
-    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
-        .ok_or_else(|| "Failed to get app data directory".to_string())?;
-    
-    let custom_icons_dir = app_data_dir.join("custom_folder_icons");
-    if !custom_icons_dir.exists() {
-        fs::create_dir_all(&custom_icons_dir)
-            .map_err(|e| format!("Failed to create custom folder icons directory: {}", e))?;
-    }
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
 
-    // Create a unique filename based on the folder path
-    let hash = format!("{:x}", md5::compute(&folder_path));
-    let icon_path = custom_icons_dir.join(format!("{}.png", hash));
-
-    // Decode base64 image data
-    let icon_bytes = STANDARD
-        .decode(&icon_data)
-        .map_err(|e| format!("Failed to decode icon data: {}", e))?;
-
-    // Load and process the image
-    let img = image::load_from_memory(&icon_bytes)
-        .map_err(|e| format!("Failed to load image: {}", e))?;
-
-    // Resize to 128x128 with high-quality filtering, maintaining aspect ratio
-    let resized = img.resize(128, 128, FilterType::Lanczos3);
-
-    // Ensure the image is in RGBA8 format
-    let rgba_image = if resized.color() == image::ColorType::Rgba8 {
-        resized
-    } else {
-        // Convert to RGBA8 if it's not already
-        image::DynamicImage::ImageRgba8(resized.to_rgba8())
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
     };
 
-    // Save as PNG with optimal compression
-    let mut output_buffer = Vec::new();
-    rgba_image.write_to(&mut std::io::Cursor::new(&mut output_buffer), ImageFormat::Png)
-        .map_err(|e| format!("Failed to encode image: {}", e))?;
+    if let Some(manager) = manager {
+        // Decode base64 data
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(&icon_data)
+            .map_err(|e| format!("Failed to decode icon data: {}", e))?;
 
-    // Write the file atomically
-    let temp_path = icon_path.with_extension("tmp");
-    fs::write(&temp_path, &output_buffer)
-        .map_err(|e| format!("Failed to save temporary icon: {}", e))?;
-    
-    fs::rename(&temp_path, &icon_path)
-        .map_err(|e| format!("Failed to save icon: {}", e))?;
+        // Create a new instance and save the icon
+        let new_manager = manager.clone();
+        let result = new_manager.save_custom_folder_icon(folder_path, data).await?;
 
-    // Return the processed image as base64 for immediate UI update
-    let base64_result = format!("data:image/png;base64,{}", STANDARD.encode(&output_buffer));
-    Ok(base64_result)
+        // Update the stored manager
+        let mut manager_guard = manager_lock.lock().unwrap();
+        *manager_guard = Some(new_manager);
+
+        Ok(result)
+    } else {
+        Err("Preferences manager not initialized".to_string())
+    }
 }
 
 #[tauri::command]
 async fn remove_custom_folder_icon(folder_path: String) -> Result<String, String> {
-    // Get the app's data directory
-    let app_data_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
-        .ok_or_else(|| "Failed to get app directory".to_string())?;
-    
-    let custom_icons_dir = app_data_dir.join("custom_folder_icons");
-    let hash = format!("{:x}", md5::compute(&folder_path));
-    let icon_path = custom_icons_dir.join(format!("{}.png", hash));
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
-    // Remove the icon file if it exists
-    if icon_path.exists() {
-        fs::remove_file(&icon_path)
-            .map_err(|e| format!("Failed to remove custom folder icon: {}", e))?;
+    let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    // Clone the manager to avoid holding the lock across await
+    let manager = {
+        let manager_guard = manager_lock.lock().unwrap();
+        manager_guard.as_ref().cloned()
+    };
+
+    if let Some(manager) = manager {
+        // Use the same hashing algorithm as PreferencesManager::save_custom_folder_icon
+        let mut hasher = DefaultHasher::new();
+        folder_path.hash(&mut hasher);
+        let hash = hasher.finish();
+        let filename = format!("{:x}.png", hash);
+        let icon_path = manager.get_custom_icon_path(&format!("custom_icons/{}", filename)).await;
+
+        // Remove the icon file if it exists
+        if icon_path.exists() {
+            fs::remove_file(&icon_path)
+                .map_err(|e| format!("Failed to remove custom folder icon: {}", e))?;
+        }
+
+        Ok("Folder icon removed".to_string())
+    } else {
+        Err("Preferences manager not initialized".to_string())
     }
-
-    Ok("Folder icon removed".to_string())
 }
 
 #[tauri::command]
@@ -662,9 +648,8 @@ async fn load_app_settings() -> Result<AppSettings, String> {
         log_error("Settings file does not exist, creating default settings");
         return Ok(AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1340,9 +1325,8 @@ mod tests {
         // Test that default minimize behavior is false (taskbar minimize)
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None, // Default case
@@ -1360,9 +1344,9 @@ mod tests {
         // Test that minimize to tray can be enabled
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1379,9 +1363,9 @@ mod tests {
         // Test that minimize to tray can be explicitly disabled
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1398,9 +1382,9 @@ mod tests {
         // Test that error handling works when minimize_to_tray is None
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: None,
@@ -1415,9 +1399,9 @@ mod tests {
         // Test with Some(true)
         let settings_enabled = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1434,9 +1418,9 @@ mod tests {
         // Test that startup settings are properly integrated with AppSettings
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1451,9 +1435,9 @@ mod tests {
         // Test default case
         let default_settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1489,9 +1473,9 @@ mod tests {
         // Test that start_minimized setting is properly integrated with AppSettings
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1506,9 +1490,9 @@ mod tests {
         // Test default case (should default to true to maintain current behavior)
         let default_settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1556,9 +1540,9 @@ mod tests {
         // Test that AppSettings struct properly handles start_minimized field
         let settings_with_true = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1570,9 +1554,9 @@ mod tests {
         
         let settings_with_false = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1584,9 +1568,9 @@ mod tests {
         
         let settings_with_none = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(false),
@@ -1602,9 +1586,9 @@ mod tests {
         // Test the default behavior logic for start_minimized
         let settings_none = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1619,9 +1603,9 @@ mod tests {
         // When start_minimized is explicitly set, it should use that value
         let settings_false = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),
@@ -1638,9 +1622,9 @@ mod tests {
         // Test that start_minimized field can be serialized and deserialized
         let settings = AppSettings {
             custom_icons: std::collections::HashMap::new(),
-            moved_apps: std::collections::HashMap::new(),
+            
             pinned_apps: Vec::new(),
-            recent_apps: Vec::new(),
+            
             is_grid_view: true,
             categories: std::collections::HashMap::new(),
             minimize_to_tray: Some(true),

@@ -65,7 +65,6 @@ interface AppState {
   isLoading: boolean;
   isGridView: boolean;
   customIcons: Record<string, string>;
-  movedApps: Record<string, string>;
   pinnedApps: string[];
   lastAccessed: Record<string, string>;
   categories: Record<string, string>;
@@ -80,7 +79,6 @@ interface AppState {
   refreshApps: () => Promise<void>;
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => Promise<void>;
-  moveApp: (path: string, newPath: string) => void;
   initializeApps: () => Promise<void>;
 }
 
@@ -90,7 +88,6 @@ const initialState = {
   isLoading: true,
   isGridView: true,
   customIcons: {},
-  movedApps: {},
   pinnedApps: [],
   lastAccessed: {},
   categories: {},
@@ -283,15 +280,13 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
       // Apply all saved settings
       const updatedApps = apps.map(newApp => {
-        const movedPath = state.movedApps[newApp.path] || newApp.path;
         const category = state.categories[newApp.path] || newApp.category;
-        const isPinned = state.pinnedApps.includes(movedPath);
+        const isPinned = state.pinnedApps.includes(newApp.path);
         const lastAccessed = state.lastAccessed[newApp.path];
-        const customIcon = state.customIcons[movedPath];
+        const customIcon = state.customIcons[newApp.path];
 
         return {
           ...newApp,
-          path: movedPath,
           category,
           isPinned,
           lastAccessed,
@@ -322,18 +317,16 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
       // Apply all saved settings
       const updatedApps = apps.map(newApp => {
-        const movedPath = state.movedApps[newApp.path] || newApp.path;
         const category = state.categories[newApp.path] || newApp.category;
-        const isPinned = state.pinnedApps.includes(movedPath);
+        const isPinned = state.pinnedApps.includes(newApp.path);
         const lastAccessed = state.lastAccessed[newApp.path];
 
         return {
           ...newApp,
-          path: movedPath,
           category,
           isPinned,
           lastAccessed,
-          icon: state.customIcons[movedPath] || 'loading',
+          icon: state.customIcons[newApp.path] || 'loading',
         };
       });
 
@@ -455,43 +448,6 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  moveApp: async (path: string, newPath: string) => {
-    const state = get();
-    const newMovedApps = { ...state.movedApps };
-    newMovedApps[path] = newPath;
-
-    // Update UI state immediately
-    set({
-      movedApps: newMovedApps,
-      apps: state.apps.map(app =>
-        app.path === path
-          ? { ...app, path: newPath }
-          : app
-      )
-    });
-
-    // Send to backend
-    try {
-      await invoke('update_preferences', {
-        updates: {
-          apps: {
-            moved_apps: newMovedApps
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Failed to update moved apps:', error);
-      // Revert UI state on error
-      set({
-        movedApps: state.movedApps,
-        apps: state.apps.map(app =>
-          app.path === path
-            ? { ...app, path: path }
-            : app
-        )
-      });
-    }
-  },
 
   initializeApps: async () => {
     try {
@@ -502,7 +458,6 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
       if (prefs.apps) {
         set({
           customIcons: prefs.apps.custom_icons || {},
-          movedApps: prefs.apps.moved_apps || {},
           pinnedApps: prefs.apps.pinned || [],
           categories: prefs.apps.categories || {},
           lastAccessed: prefs.apps.last_accessed || {},

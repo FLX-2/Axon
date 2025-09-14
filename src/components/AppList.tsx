@@ -4,6 +4,7 @@ import { AppInfo, AppCategory } from '../types/app';
 import { Play, Pin } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { AppContextMenu } from './AppContextMenu';
+import { useGridColumns } from '../hooks/useGridColumns';
 
 interface AppListProps {
   selectedCategory: string | null;
@@ -153,6 +154,7 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     updateLastAccessed,
     updateCategory
   } = useUnifiedAppStore();
+  const columns = useGridColumns();
   
   const handleLaunch = async (path: string) => {
     try {
@@ -171,7 +173,7 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
   const recentApps = filteredApps
     .filter(app => app.lastAccessed)
     .sort((a, b) => new Date(b.lastAccessed!).getTime() - new Date(a.lastAccessed!).getTime())
-    .slice(0, 5); // Show top 5 recent apps
+    .slice(0, columns); // Show top apps based on columns
 
   const allApps = [...filteredApps].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;

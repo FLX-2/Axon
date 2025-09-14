@@ -167,32 +167,3 @@ export const PATTERNS = {
   /** Theme button pattern (selected state handled separately) */
   themeButton: `${LAYOUTS.iconText} ${SPACING.buttonPaddingCompact} ${BORDER_RADIUS.standard} ${TRANSITIONS.colors}`,
 } as const;
-
-/**
- * Helper function to get toggle background color based on state
- */
-export const getToggleBackground = (isActive: boolean): string => {
-  return isActive ? COLORS.active : COLORS.neutral;
-};
-
-/**
- * Helper function to get toggle indicator position based on state
- */
-export const getToggleIndicatorPosition = (isActive: boolean): string => {
-  return isActive ? 'translate-x-6' : 'translate-x-1';
-};
-
-/**
- * Helper function to get button state classes
- */
-export const getButtonStateClasses = (isSelected: boolean, isDisabled: boolean = false): string => {
-  if (isDisabled) {
-    return STATES.disabled;
-  }
-  
-  if (isSelected) {
-    return `${COLORS.selected} ${COLORS.text.primary}`;
-  }
-  
-  return `${COLORS.hover} ${COLORS.text.primary}`;
-};

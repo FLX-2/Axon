@@ -40,12 +40,10 @@ use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use md5;
 use url;
 
-mod app_manager;
 mod startup_manager;
 mod preferences_manager;
 #[cfg(test)]
 mod unit_tests;
-use app_manager::AppManager;
 use startup_manager::StartupManager;
 use preferences_manager::{PreferencesManager, AppPreferences};
 
@@ -55,17 +53,6 @@ struct AppInfo {
     path: String,
     icon: Option<String>,
     category: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct AppSettings {
-    custom_icons: std::collections::HashMap<String, String>,
-    pinned_apps: Vec<String>,
-    is_grid_view: bool,
-    categories: std::collections::HashMap<String, String>,
-    minimize_to_tray: Option<bool>,
-    startup_enabled: Option<bool>,
-    start_minimized: Option<bool>,
 }
 
 // Memory cache for app scanning results
@@ -636,70 +623,6 @@ async fn shell_open(path: String) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-async fn load_app_settings() -> Result<AppSettings, String> {
-    let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
-        .ok_or_else(|| "Failed to get app directory".to_string())?;
-    
-    let settings_file = app_dir.join("settings.json");
-    log_error(&format!("Loading settings from: {}", settings_file.display()));
-    
-    if !settings_file.exists() {
-        log_error("Settings file does not exist, creating default settings");
-        return Ok(AppSettings {
-            custom_icons: std::collections::HashMap::new(),
-            pinned_apps: Vec::new(),
-            
-            is_grid_view: true,
-            categories: std::collections::HashMap::new(),
-            minimize_to_tray: Some(false),
-            startup_enabled: Some(false),
-            start_minimized: Some(true),
-        });
-    }
-    
-    let content = fs::read_to_string(&settings_file)
-        .map_err(|e| {
-            log_error(&format!("Failed to read settings: {}", e));
-            format!("Failed to read settings: {}", e)
-        })?;
-    
-    serde_json::from_str(&content)
-        .map_err(|e| {
-            log_error(&format!("Failed to parse settings: {}", e));
-            format!("Failed to parse settings: {}", e)
-        })
-}
-
-#[tauri::command]
-async fn save_app_settings(settings: AppSettings) -> Result<(), String> {
-    let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
-        .ok_or_else(|| "Failed to get app directory".to_string())?;
-    
-    log_error(&format!("Saving settings to: {}", app_dir.display()));
-    
-    fs::create_dir_all(&app_dir)
-        .map_err(|e| {
-            log_error(&format!("Failed to create app directory: {}", e));
-            format!("Failed to create app directory: {}", e)
-        })?;
-    
-    let settings_file = app_dir.join("settings.json");
-    let content = serde_json::to_string_pretty(&settings)
-        .map_err(|e| {
-            log_error(&format!("Failed to serialize settings: {}", e));
-            format!("Failed to serialize settings: {}", e)
-        })?;
-    
-    fs::write(&settings_file, &content)
-        .map_err(|e| {
-            log_error(&format!("Failed to write settings: {}", e));
-            format!("Failed to write settings: {}", e)
-        })?;
-    
-    log_error(&format!("Successfully saved settings: {}", content));
-    Ok(())
-}
 
 // Enable logging for debugging - disabled in release builds
 fn log_error(_error: &str) {
@@ -736,11 +659,8 @@ async fn set_minimize_behavior(minimize_to_tray: bool) -> Result<(), String> {
         Ok(())
     } else {
         log_error("Preferences manager not available, falling back to old settings");
-        // Fallback to old settings for backward compatibility
-        let mut settings = load_app_settings().await?;
-        settings.minimize_to_tray = Some(minimize_to_tray);
-        save_app_settings(settings).await?;
-        log_error(&format!("Minimize behavior set to: {} (old)", minimize_to_tray));
+        // Fallback for backward compatibility (can be removed in future)
+        log_error(&format!("Minimize behavior set to: {} (fallback)", minimize_to_tray));
         Ok(())
     }
 }
@@ -763,11 +683,9 @@ async fn get_minimize_behavior() -> Result<bool, String> {
         Ok(minimize_to_tray)
     } else {
         log_error("Preferences manager not available, falling back to old settings");
-        // Fallback to old settings for backward compatibility
-        let settings = load_app_settings().await?;
-        let minimize_to_tray = settings.minimize_to_tray.unwrap_or(false);
-        log_error(&format!("Retrieved minimize behavior from old settings: {}", minimize_to_tray));
-        Ok(minimize_to_tray)
+        // Fallback for backward compatibility (can be removed in future)
+        log_error("Retrieved minimize behavior from fallback");
+        Ok(false)
     }
 }
 
@@ -781,15 +699,6 @@ async fn set_startup_enabled(enabled: bool) -> Result<(), String> {
             log_error(&format!("Failed to set startup registry entry: {}", e));
             e
         })?;
-    
-    // Load current settings
-    let mut settings = load_app_settings().await?;
-    
-    // Update the startup preference in settings
-    settings.startup_enabled = Some(enabled);
-    
-    // Save the updated settings
-    save_app_settings(settings).await?;
     
     log_error(&format!("Startup setting saved successfully: {}", enabled));
     Ok(())
@@ -806,17 +715,6 @@ async fn get_startup_enabled() -> Result<bool, String> {
             e
         })?;
     
-    // Load current settings to sync with registry state
-    let mut settings = load_app_settings().await?;
-    let settings_enabled = settings.startup_enabled.unwrap_or(false);
-    
-    // If there's a mismatch between registry and settings, sync them
-    if registry_enabled != settings_enabled {
-        log_error(&format!("Syncing startup setting: registry={}, settings={}", registry_enabled, settings_enabled));
-        settings.startup_enabled = Some(registry_enabled);
-        save_app_settings(settings).await?;
-    }
-    
     log_error(&format!("Retrieved startup enabled state: {}", registry_enabled));
     Ok(registry_enabled)
 }
@@ -832,15 +730,6 @@ async fn is_started_from_startup() -> Result<bool, String> {
 async fn set_start_minimized(enabled: bool) -> Result<(), String> {
     log_error(&format!("Setting start minimized to: {}", enabled));
     
-    // Load current settings
-    let mut settings = load_app_settings().await?;
-    
-    // Update the start minimized preference
-    settings.start_minimized = Some(enabled);
-    
-    // Save the updated settings
-    save_app_settings(settings).await?;
-    
     log_error(&format!("Start minimized setting saved successfully: {}", enabled));
     Ok(())
 }
@@ -849,14 +738,8 @@ async fn set_start_minimized(enabled: bool) -> Result<(), String> {
 async fn get_start_minimized() -> Result<bool, String> {
     log_error("Getting start minimized state");
     
-    // Load current settings
-    let settings = load_app_settings().await?;
-    
-    // Return the start minimized preference, defaulting to true if not set (maintains current behavior)
-    let start_minimized = settings.start_minimized.unwrap_or(true);
-    
-    log_error(&format!("Retrieved start minimized state: {}", start_minimized));
-    Ok(start_minimized)
+    log_error("Retrieved start minimized state from fallback");
+    Ok(true)
 }
 
 // New file system storage commands
@@ -1258,9 +1141,6 @@ fn main() {
                     }
                 }
 
-                let app_manager = AppManager::new();
-                app_manager.start_file_watcher();
-
                 log_error("Setup completed successfully");
                 Ok(())
             })
@@ -1287,8 +1167,6 @@ fn main() {
                 remove_custom_icon,
                 remove_custom_folder_icon,
                 shell_open,
-                load_app_settings,
-                save_app_settings,
                 set_minimize_behavior,
                 get_minimize_behavior,
                 set_startup_enabled,
@@ -1307,7 +1185,6 @@ fn main() {
                 save_custom_icon_bytes
             ]);
 
-        log_error("Starting application...");
         log_error("Starting application...");
         if let Err(e) = app.run(tauri::generate_context!()) {
             log_error(&format!("Application failed to run: {:?}", e));

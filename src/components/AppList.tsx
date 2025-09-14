@@ -163,29 +163,45 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     }
   };
 
-  const filteredApps = apps.filter(app => 
+  const filteredApps = apps.filter(app =>
     app.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (selectedCategory === null || app.category === selectedCategory)
   );
 
-  const sortedApps = [...filteredApps].sort((a, b) => {
+  const recentApps = filteredApps
+    .filter(app => app.lastAccessed)
+    .sort((a, b) => new Date(b.lastAccessed!).getTime() - new Date(a.lastAccessed!).getTime())
+    .slice(0, 5); // Show top 5 recent apps
+
+  const allApps = [...filteredApps].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
     return a.name.localeCompare(b.name);
   });
 
-
   return (
     <div className="p-4">
+      {!selectedCategory && recentApps.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-textSecondary mb-3">
+            Recent Apps
+          </h2>
+          <AppGrid
+            apps={recentApps}
+            isGridView={isGridView}
+            onPin={togglePinned}
+            onLaunch={handleLaunch}
+            onMove={updateCategory}
+          />
+        </div>
+      )}
 
       <div className="mb-6">
-        {!selectedCategory && (
-          <h2 className="text-sm font-semibold text-textSecondary mb-3">
-            All Apps
-          </h2>
-        )}
-        <AppGrid 
-          apps={sortedApps}
+        <h2 className="text-sm font-semibold text-textSecondary mb-3">
+          {selectedCategory ? `Apps in ${selectedCategory}` : 'All Apps'}
+        </h2>
+        <AppGrid
+          apps={allApps}
           isGridView={isGridView}
           onPin={togglePinned}
           onLaunch={handleLaunch}

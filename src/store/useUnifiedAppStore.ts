@@ -187,31 +187,38 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
   updateLastAccessed: async (path, timestamp) => {
     const state = get();
+    
+    // Create a new lastAccessed object and add the new entry
+    const newLastAccessed = {
+      ...state.lastAccessed,
+      [path]: timestamp,
+    };
+
+    // Sort by timestamp and keep only the 5 most recent
+    const sorted = Object.entries(newLastAccessed)
+      .sort(([, a], [, b]) => new Date(b).getTime() - new Date(a).getTime())
+      .slice(0, 5);
+
+    const limitedLastAccessed = Object.fromEntries(sorted);
 
     // Update UI state immediately
     set({
-      lastAccessed: {
-        ...state.lastAccessed,
-        [path]: timestamp
-      },
+      lastAccessed: limitedLastAccessed,
       apps: state.apps.map(app =>
         app.path === path
           ? { ...app, lastAccessed: timestamp }
           : app
-      )
+      ),
     });
 
-    // Send to backend
+    // Send the limited list to the backend
     try {
       await invoke('update_preferences', {
         updates: {
           apps: {
-            last_accessed: {
-              ...state.lastAccessed,
-              [path]: timestamp
-            }
-          }
-        }
+            last_accessed: limitedLastAccessed,
+          },
+        },
       });
     } catch (error) {
       console.error('Failed to update last accessed:', error);
@@ -222,7 +229,7 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
           app.path === path
             ? { ...app, lastAccessed: state.lastAccessed[path] }
             : app
-        )
+        ),
       });
     }
   },

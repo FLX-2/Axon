@@ -200,7 +200,7 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
 
       <div className="mb-6">
         <h2 className="text-sm font-semibold text-textSecondary mb-3">
-          {selectedCategory ? `Apps in ${selectedCategory}` : 'All Apps'}
+          {selectedCategory ? selectedCategory : 'All Apps'}
         </h2>
         <AppGrid
           apps={allApps}

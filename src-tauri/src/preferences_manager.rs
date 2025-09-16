@@ -22,6 +22,7 @@ pub struct BehaviorSettings {
     pub minimize_to_tray: bool,
     pub startup_enabled: bool,
     pub start_minimized: bool,
+    pub global_hotkey: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +67,7 @@ impl Default for AppPreferences {
                 minimize_to_tray: false,
                 startup_enabled: false,
                 start_minimized: true,
+                global_hotkey: Some("CmdOrCtrl+Shift+A".to_string()),
             },
             apps: AppSettings {
                 pinned: Vec::new(),

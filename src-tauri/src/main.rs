@@ -42,8 +42,10 @@ use url;
 
 mod startup_manager;
 mod preferences_manager;
+mod hotkey_manager;
 use startup_manager::StartupManager;
 use preferences_manager::{PreferencesManager, AppPreferences};
+use hotkey_manager::HotkeyManager;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct AppInfo {
@@ -687,6 +689,7 @@ async fn get_start_minimized() -> Result<bool, String> {
 
 // New file system storage commands
 static PREFERENCES_MANAGER: std::sync::OnceLock<std::sync::Mutex<Option<PreferencesManager>>> = std::sync::OnceLock::new();
+static HOTKEY_MANAGER: std::sync::OnceLock<std::sync::Mutex<Option<HotkeyManager>>> = std::sync::OnceLock::new();
 
 #[tauri::command]
 async fn get_preferences() -> Result<AppPreferences, String> {
@@ -852,6 +855,53 @@ async fn validate_startup_configuration() -> Result<bool, String> {
     
     log_error("Startup configuration validation completed");
     Ok(!path_changed) // Return true if no issues were found
+}
+
+#[tauri::command]
+async fn register_global_hotkey(hotkey: String) -> Result<(), String> {
+    let hotkey_manager_lock = HOTKEY_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+    let preferences_manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    let (hotkey_manager, preferences_manager) = {
+        let hm_guard = hotkey_manager_lock.lock().unwrap();
+        let pm_guard = preferences_manager_lock.lock().unwrap();
+        
+        match (hm_guard.as_ref(), pm_guard.as_ref()) {
+            (Some(hm), Some(pm)) => (hm.clone(), pm.clone()),
+            _ => return Err("Managers not initialized".to_string()),
+        }
+    };
+
+    // Validate hotkey format
+    if !HotkeyManager::validate_hotkey(&hotkey) {
+        return Err("Invalid hotkey format".to_string());
+    }
+
+    // Register the hotkey
+    hotkey_manager.register_hotkey(&hotkey, &preferences_manager).await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn unregister_global_hotkey() -> Result<(), String> {
+    let hotkey_manager_lock = HOTKEY_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+
+    let hotkey_manager = {
+        let hm_guard = hotkey_manager_lock.lock().unwrap();
+        match hm_guard.as_ref() {
+            Some(hm) => hm.clone(),
+            None => return Err("Hotkey manager not initialized".to_string()),
+        }
+    };
+
+    hotkey_manager.unregister_current_hotkey()?;
+    Ok(())
+}
+
+#[tauri::command]
+fn validate_hotkey_format(hotkey: String) -> Result<bool, String> {
+    Ok(HotkeyManager::validate_hotkey(&hotkey))
 }
 
 
@@ -1056,6 +1106,21 @@ fn main() {
                 let manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
                 *manager_lock.lock().unwrap() = Some(preferences_manager.clone());
 
+                // Initialize hotkey manager
+                let hotkey_manager = HotkeyManager::new(app.handle());
+                let hotkey_manager_lock = HOTKEY_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
+                *hotkey_manager_lock.lock().unwrap() = Some(hotkey_manager.clone());
+
+                // Register initial hotkey if set
+                let preferences = preferences_manager.get_preferences().await;
+                if let Some(hotkey) = &preferences.behavior.global_hotkey {
+                    if let Err(e) = hotkey_manager.register_hotkey(hotkey, &preferences_manager).await {
+                        log_error(&format!("Failed to register initial hotkey '{}': {}", hotkey, e));
+                    } else {
+                        log_error(&format!("Registered initial hotkey: {}", hotkey));
+                    }
+                }
+
                 // Now handle startup behavior with proper preferences access
                 if started_from_startup {
                     // Use a blocking task to read preferences synchronously
@@ -1125,7 +1190,11 @@ fn main() {
                 save_custom_icon_unified,
                 get_custom_icon_path,
                 save_custom_icon_from_path,
-                save_custom_icon_bytes
+                save_custom_icon_bytes,
+                // Hotkey system
+                register_global_hotkey,
+                unregister_global_hotkey,
+                validate_hotkey_format
             ]);
 
         log_error("Starting application...");

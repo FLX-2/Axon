@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { AppInfo, AppCategory } from '../types/app';
-import { Play, Pin } from 'lucide-react';
+import { Play, Pin, ChevronDown, ChevronUp } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { AppContextMenu } from './AppContextMenu';
 import { useGridColumns } from '../hooks/useGridColumns';
@@ -9,6 +9,166 @@ import { useGridColumns } from '../hooks/useGridColumns';
 interface AppListProps {
   selectedCategory: string | null;
 }
+
+const RecentAppsExpandable: React.FC<{
+  apps: AppInfo[];
+  isGridView: boolean;
+  onPin: (path: string) => void;
+  onLaunch: (path: string) => void;
+  onMove: (path: string, category: AppCategory) => void;
+}> = ({ apps, isGridView, onPin, onLaunch, onMove }) => {
+  const [contextMenu, setContextMenu] = useState<{
+    app: AppInfo;
+    position: { x: number; y: number };
+  } | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
+  const columns = useGridColumns();
+
+  // Calculate how many apps can fit in one row based on current screen size
+  useEffect(() => {
+    const calculateVisibleApps = () => {
+      // Use the same logic as the main grid to determine how many fit
+      if (columns >= 5) {
+        setVisibleCount(5); // Can fit all 5
+        setIsExpanded(false); // Auto-collapse when all apps fit naturally
+      } else {
+        setVisibleCount(Math.min(columns, apps.length)); // Show what fits
+      }
+    };
+
+    calculateVisibleApps();
+    window.addEventListener('resize', calculateVisibleApps);
+    return () => window.removeEventListener('resize', calculateVisibleApps);
+  }, [apps.length, columns]);
+
+  const handleContextMenu = (e: React.MouseEvent, app: AppInfo) => {
+    e.preventDefault();
+    setContextMenu({
+      app,
+      position: { x: e.clientX, y: e.clientY },
+    });
+  };
+
+  const visibleApps = isExpanded ? apps : apps.slice(0, visibleCount);
+  const hasHiddenApps = apps.length > visibleCount && !isExpanded;
+
+  const AppCard: React.FC<{ app: AppInfo }> = ({ app }) => (
+    <div
+      onContextMenu={(e) => handleContextMenu(e, app)}
+      onClick={() => onLaunch(app.path)}
+      className="flex flex-col items-center p-4 aspect-[3/4] bg-surfaceSecondary hover:bg-surfaceHover group transition-colors rounded-lg relative"
+    >
+      <button
+        className={`
+          absolute top-2 right-2
+          transition-opacity
+          ${app.isPinned 
+            ? 'opacity-100' 
+            : 'opacity-0 group-hover:opacity-100'
+          }
+        `}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPin(app.path);
+        }}
+        title={app.isPinned ? "Unpin" : "Pin"}
+      >
+        <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconSecondary'}`} />
+      </button>
+      
+      <div className="flex-1 flex flex-col items-center justify-center w-full">
+        {app.icon && app.icon !== 'loading' ? (
+          <img
+            src={app.icon}
+            alt={app.name}
+            className="app-icon w-20 h-20 mb-4"
+          />
+        ) : (
+          <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
+            <Play className="w-8 h-8 text-iconSecondary" />
+          </div>
+        )}
+        <span className="text-sm text-textPrimary text-center">
+          {app.name}
+        </span>
+      </div>
+    </div>
+  );
+
+  // If in list view, just use the regular AppGrid component
+  if (!isGridView) {
+    return (
+      <AppGrid
+        apps={apps}
+        isGridView={isGridView}
+        onPin={onPin}
+        onLaunch={onLaunch}
+        onMove={onMove}
+      />
+    );
+  }
+
+  // Grid view: Use expandable functionality
+  return (
+    <>
+      <div>
+        {isExpanded ? (
+          // Expanded view: Allow wrapping with current grid system
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {visibleApps.map((app) => (
+              <AppCard key={app.path} app={app} />
+            ))}
+          </div>
+        ) : (
+          // Collapsed view: Single row only
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {visibleApps.map((app) => (
+              <AppCard key={app.path} app={app} />
+            ))}
+          </div>
+        )}
+        
+        {/* Show more/less buttons - always centered below */}
+        {hasHiddenApps && !isExpanded && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-surfaceSecondary hover:bg-surfaceHover transition-colors rounded-lg text-sm text-textSecondary"
+            >
+              <ChevronDown className="w-4 h-4" />
+              Show {apps.length - visibleCount} more
+            </button>
+          </div>
+        )}
+        
+        {isExpanded && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-2 px-3 py-2 bg-surfaceSecondary hover:bg-surfaceHover transition-colors rounded-lg text-sm text-textSecondary"
+            >
+              <ChevronUp className="w-4 h-4" />
+              Show less
+            </button>
+          </div>
+        )}
+      </div>
+
+      {contextMenu && (
+        <AppContextMenu
+          app={contextMenu.app}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onMove={(category) => {
+            onMove(contextMenu.app.path, category as AppCategory);
+            setContextMenu(null);
+          }}
+        />
+      )}
+    </>
+  );
+};
 
 const AppGrid: React.FC<{
   apps: AppInfo[];
@@ -173,7 +333,7 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
   const recentApps = filteredApps
     .filter(app => app.lastAccessed)
     .sort((a, b) => new Date(b.lastAccessed!).getTime() - new Date(a.lastAccessed!).getTime())
-    .slice(0, columns); // Show top apps based on columns
+    .slice(0, 5); // Always get top 5 recent apps
 
   const allApps = [...filteredApps].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
@@ -188,7 +348,7 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
           <h2 className="text-sm font-semibold text-textSecondary mb-3">
             Recent Apps
           </h2>
-          <AppGrid
+          <RecentAppsExpandable
             apps={recentApps}
             isGridView={isGridView}
             onPin={togglePinned}

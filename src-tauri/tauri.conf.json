@@ -72,7 +72,9 @@
         "alwaysOnTop": false,
         "focus": true,
         "skipTaskbar": false,
-        "fileDropEnabled": false
+        "fileDropEnabled": false,
+        "minWidth": 345,
+        "minHeight": 360
       }
     ]
   }

@@ -17,7 +17,7 @@ export const SearchBar: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border-b border-border bg-surfaceSecondary flex items-center gap-4">
+    <div className="p-4 border-b border-border bg-surfaceSecondary flex items-center gap-2.5">
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-iconSecondary w-5 h-5" />
         <input
@@ -48,6 +48,7 @@ export const SearchBar: React.FC = () => {
           <LayoutGrid className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
         )}
       </button>
+      <div className="w-px h-7 bg-border"></div>
       <button
         onClick={handleAddApp}
         className="p-3 hover:bg-buttonHover rounded-lg transition-colors"

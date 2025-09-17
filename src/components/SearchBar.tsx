@@ -1,9 +1,20 @@
 import React from 'react';
-import { Search, LayoutGrid, List, X } from 'lucide-react';
+import { Search, LayoutGrid, List, X, Plus } from 'lucide-react';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
+import { invoke } from '@tauri-apps/api/tauri';
 
 export const SearchBar: React.FC = () => {
-  const { searchTerm, setSearchTerm, isGridView, toggleView } = useUnifiedAppStore();
+  const { searchTerm, setSearchTerm, isGridView, toggleView, refreshApps } = useUnifiedAppStore();
+
+  const handleAddApp = async () => {
+    try {
+      await invoke('add_custom_app');
+      // Refresh the app list after adding
+      refreshApps();
+    } catch (error) {
+      console.error('Failed to add app:', error);
+    }
+  };
 
   return (
     <div className="p-4 border-b border-border bg-surfaceSecondary flex items-center gap-4">
@@ -28,7 +39,7 @@ export const SearchBar: React.FC = () => {
       </div>
       <button
         onClick={() => toggleView()}
-        className="p-2 hover:bg-buttonHover rounded-lg transition-colors"
+        className="p-3 hover:bg-buttonHover rounded-lg transition-colors"
         title={isGridView ? "Switch to list view" : "Switch to grid view"}
       >
         {isGridView ? (
@@ -36,6 +47,13 @@ export const SearchBar: React.FC = () => {
         ) : (
           <LayoutGrid className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
         )}
+      </button>
+      <button
+        onClick={handleAddApp}
+        className="p-3 hover:bg-buttonHover rounded-lg transition-colors"
+        title="Add custom app"
+      >
+        <Plus className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
       </button>
     </div>
   );

@@ -902,6 +902,93 @@ fn validate_hotkey_format(hotkey: String) -> Result<bool, String> {
     Ok(HotkeyManager::validate_hotkey(&hotkey))
 }
 
+#[tauri::command]
+async fn add_custom_app() -> Result<(), String> {
+    use tauri::api::dialog;
+
+    // Open file picker for .exe and .lnk files
+    let file_path = dialog::blocking::FileDialogBuilder::new()
+        .add_filter("Executable files", &["exe", "lnk"])
+        .pick_file();
+
+    let file_path = match file_path {
+        Some(path) => path,
+        None => return Err("No file selected".to_string()),
+    };
+
+    // Check file extension
+    let extension = file_path.extension()
+        .and_then(|ext| ext.to_str())
+        .ok_or("Invalid file extension")?;
+
+    if extension != "exe" && extension != "lnk" {
+        return Err("Only .exe and .lnk files are supported".to_string());
+    }
+
+    // Get the Start Menu Axon folder path
+    let appdata = std::env::var("APPDATA")
+        .map_err(|_| "Failed to get APPDATA environment variable")?;
+    let axon_folder = std::path::Path::new(&appdata)
+        .join("Microsoft\\Windows\\Start Menu\\Programs\\Axon");
+
+    // Create Axon folder if it doesn't exist
+    if !axon_folder.exists() {
+        fs::create_dir_all(&axon_folder)
+            .map_err(|e| format!("Failed to create Axon folder: {}", e))?;
+    }
+
+    // Determine the target path and create shortcut
+    let file_stem = file_path.file_stem()
+        .ok_or("Invalid file name")?
+        .to_string_lossy();
+    let shortcut_path = axon_folder.join(format!("{}.lnk", file_stem));
+
+    // If it's already a .lnk file, copy it directly
+    if extension == "lnk" {
+        fs::copy(&file_path, &shortcut_path)
+            .map_err(|e| format!("Failed to copy shortcut: {}", e))?;
+    } else {
+        // For .exe files, create a new shortcut
+        create_shortcut(&file_path, &shortcut_path)?;
+    }
+
+    log_error(&format!("Added custom app shortcut: {} -> {}", file_path.display(), shortcut_path.display()));
+    Ok(())
+}
+
+fn create_shortcut(target_path: &std::path::Path, shortcut_path: &std::path::Path) -> Result<(), String> {
+    unsafe {
+        let shell_link: IShellLinkW = CoCreateInstance(
+            &ShellLink,
+            None,
+            CLSCTX_INPROC_SERVER
+        ).map_err(|e| e.to_string())?;
+
+        let persist_file: IPersistFile = shell_link.cast()
+            .map_err(|e| e.to_string())?;
+
+        // Set the target path
+        let target_path_wide: Vec<u16> = target_path.to_string_lossy()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        shell_link.SetPath(PCWSTR(target_path_wide.as_ptr()))
+            .map_err(|e| e.to_string())?;
+
+        // Save the shortcut
+        let shortcut_path_wide: Vec<u16> = shortcut_path.to_string_lossy()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        persist_file.Save(PCWSTR(shortcut_path_wide.as_ptr()), true)
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+}
+
 
 
 #[tauri::command]
@@ -1196,7 +1283,9 @@ fn main() {
                 // Hotkey system
                 register_global_hotkey,
                 unregister_global_hotkey,
-                validate_hotkey_format
+                validate_hotkey_format,
+                // Add custom app
+                add_custom_app
             ]);
 
         log_error("Starting application...");

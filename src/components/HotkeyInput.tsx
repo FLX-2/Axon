@@ -29,10 +29,6 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
         case 'ctrl':
           if (!modifiers.includes('Ctrl')) modifiers.push('Ctrl');
           break;
-        case 'meta':
-        case 'cmd':
-          if (!modifiers.includes('Cmd')) modifiers.push('Cmd');
-          break;
         case 'alt':
           if (!modifiers.includes('Alt')) modifiers.push('Alt');
           break;
@@ -95,7 +91,6 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
     const keys: string[] = [];
     
     if (e.ctrlKey) keys.push('Ctrl');
-    if (e.metaKey) keys.push('Cmd');
     if (e.altKey) keys.push('Alt');
     if (e.shiftKey) keys.push('Shift');
     
@@ -197,7 +192,7 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
       
       {isRecording && (
         <p className="text-xs text-textSecondary mt-1">
-          Press a combination of modifier keys (Ctrl/Cmd, Alt, Shift) + a letter/number
+          Press a combination of modifier keys (Ctrl, Alt, Shift) + a letter/number
         </p>
       )}
     </div>

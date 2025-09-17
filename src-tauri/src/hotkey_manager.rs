@@ -103,7 +103,7 @@ impl HotkeyManager {
             return false; // Need at least one modifier + one key
         }
 
-        let valid_modifiers = ["Cmd", "Ctrl", "CmdOrCtrl", "Alt", "Shift", "Super"];
+        let valid_modifiers = ["Ctrl", "Alt", "Shift", "Super"];
         let mut has_modifier = false;
         let mut has_key = false;
 

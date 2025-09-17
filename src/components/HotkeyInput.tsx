@@ -27,11 +27,11 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
       switch (key.toLowerCase()) {
         case 'control':
         case 'ctrl':
-          if (!modifiers.includes('CmdOrCtrl')) modifiers.push('CmdOrCtrl');
+          if (!modifiers.includes('Ctrl')) modifiers.push('Ctrl');
           break;
         case 'meta':
         case 'cmd':
-          if (!modifiers.includes('CmdOrCtrl')) modifiers.push('CmdOrCtrl');
+          if (!modifiers.includes('Cmd')) modifiers.push('Cmd');
           break;
         case 'alt':
           if (!modifiers.includes('Alt')) modifiers.push('Alt');
@@ -94,7 +94,8 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
 
     const keys: string[] = [];
     
-    if (e.ctrlKey || e.metaKey) keys.push('CmdOrCtrl');
+    if (e.ctrlKey) keys.push('Ctrl');
+    if (e.metaKey) keys.push('Cmd');
     if (e.altKey) keys.push('Alt');
     if (e.shiftKey) keys.push('Shift');
     

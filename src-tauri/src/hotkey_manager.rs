@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, GlobalShortcutManager};
 use crate::preferences_manager::PreferencesManager;
 
 #[derive(Clone)]
@@ -20,7 +20,7 @@ impl HotkeyManager {
         // Unregister previous hotkey if exists
         if let Ok(current) = self.current_hotkey.lock() {
             if let Some(old_hotkey) = current.as_ref() {
-                if let Err(e) = self.app_handle.global_shortcut().unregister(old_hotkey) {
+                if let Err(e) = self.app_handle.global_shortcut_manager().unregister(old_hotkey) {
                     eprintln!("Failed to unregister old hotkey: {}", e);
                 }
             }
@@ -31,7 +31,7 @@ impl HotkeyManager {
         let preferences_manager = preferences_manager.clone();
         
         // Register new hotkey
-        self.app_handle.global_shortcut().register(hotkey, move || {
+        self.app_handle.global_shortcut_manager().register(hotkey, move || {
             let app_handle = app_handle.clone();
             let preferences_manager = preferences_manager.clone();
             
@@ -53,7 +53,7 @@ impl HotkeyManager {
     pub fn unregister_current_hotkey(&self) -> Result<(), String> {
         if let Ok(mut current) = self.current_hotkey.lock() {
             if let Some(hotkey) = current.take() {
-                self.app_handle.global_shortcut().unregister(&hotkey)
+                self.app_handle.global_shortcut_manager().unregister(&hotkey)
                     .map_err(|e| format!("Failed to unregister hotkey: {}", e))?;
             }
         }

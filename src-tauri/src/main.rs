@@ -862,14 +862,15 @@ async fn register_global_hotkey(hotkey: String) -> Result<(), String> {
     let hotkey_manager_lock = HOTKEY_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
     let preferences_manager_lock = PREFERENCES_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
 
-    let (hotkey_manager, preferences_manager) = {
+    // Clone the managers to avoid borrow checker issues
+    let hotkey_manager = {
         let hm_guard = hotkey_manager_lock.lock().unwrap();
+        hm_guard.as_ref().cloned().ok_or("Hotkey manager not initialized")?
+    };
+
+    let preferences_manager = {
         let pm_guard = preferences_manager_lock.lock().unwrap();
-        
-        match (hm_guard.as_ref(), pm_guard.as_ref()) {
-            (Some(hm), Some(pm)) => (hm.clone(), pm.clone()),
-            _ => return Err("Managers not initialized".to_string()),
-        }
+        pm_guard.as_ref().cloned().ok_or("Preferences manager not initialized")?
     };
 
     // Validate hotkey format
@@ -889,10 +890,7 @@ async fn unregister_global_hotkey() -> Result<(), String> {
 
     let hotkey_manager = {
         let hm_guard = hotkey_manager_lock.lock().unwrap();
-        match hm_guard.as_ref() {
-            Some(hm) => hm.clone(),
-            None => return Err("Hotkey manager not initialized".to_string()),
-        }
+        hm_guard.as_ref().cloned().ok_or("Hotkey manager not initialized")?
     };
 
     hotkey_manager.unregister_current_hotkey()?;
@@ -1111,15 +1109,19 @@ fn main() {
                 let hotkey_manager_lock = HOTKEY_MANAGER.get_or_init(|| std::sync::Mutex::new(None));
                 *hotkey_manager_lock.lock().unwrap() = Some(hotkey_manager.clone());
 
-                // Register initial hotkey if set
-                let preferences = preferences_manager.get_preferences().await;
-                if let Some(hotkey) = &preferences.behavior.global_hotkey {
-                    if let Err(e) = hotkey_manager.register_hotkey(hotkey, &preferences_manager).await {
-                        log_error(&format!("Failed to register initial hotkey '{}': {}", hotkey, e));
-                    } else {
-                        log_error(&format!("Registered initial hotkey: {}", hotkey));
+                // Register initial hotkey if set in preferences (spawn async task)
+                let hm_clone = hotkey_manager.clone();
+                let pm_clone = preferences_manager.clone();
+                tauri::async_runtime::spawn(async move {
+                    let preferences = pm_clone.get_preferences().await;
+                    if let Some(hotkey) = &preferences.behavior.global_hotkey {
+                        if let Err(e) = hm_clone.register_hotkey(hotkey, &pm_clone).await {
+                            log_error(&format!("Failed to register initial hotkey '{}': {}", hotkey, e));
+                        } else {
+                            log_error(&format!("Registered initial hotkey: {}", hotkey));
+                        }
                     }
-                }
+                });
 
                 // Now handle startup behavior with proper preferences access
                 if started_from_startup {

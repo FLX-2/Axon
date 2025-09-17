@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, GlobalShortcutManager, Manager, Window};
+use tauri::{AppHandle, Manager};
 use crate::preferences_manager::PreferencesManager;
 
+#[derive(Clone)]
 pub struct HotkeyManager {
     app_handle: AppHandle,
     current_hotkey: Arc<Mutex<Option<String>>>,
@@ -16,14 +17,11 @@ impl HotkeyManager {
     }
 
     pub async fn register_hotkey(&self, hotkey: &str, preferences_manager: &PreferencesManager) -> Result<(), String> {
-        let mut global_shortcut_manager = self.app_handle.global_shortcut_manager();
-        
         // Unregister previous hotkey if exists
         if let Ok(current) = self.current_hotkey.lock() {
             if let Some(old_hotkey) = current.as_ref() {
-                if global_shortcut_manager.is_registered(old_hotkey).unwrap_or(false) {
-                    global_shortcut_manager.unregister(old_hotkey)
-                        .map_err(|e| format!("Failed to unregister old hotkey: {}", e))?;
+                if let Err(e) = self.app_handle.global_shortcut().unregister(old_hotkey) {
+                    eprintln!("Failed to unregister old hotkey: {}", e);
                 }
             }
         }
@@ -33,7 +31,7 @@ impl HotkeyManager {
         let preferences_manager = preferences_manager.clone();
         
         // Register new hotkey
-        global_shortcut_manager.register(hotkey, move || {
+        self.app_handle.global_shortcut().register(hotkey, move || {
             let app_handle = app_handle.clone();
             let preferences_manager = preferences_manager.clone();
             
@@ -53,14 +51,10 @@ impl HotkeyManager {
     }
 
     pub fn unregister_current_hotkey(&self) -> Result<(), String> {
-        let mut global_shortcut_manager = self.app_handle.global_shortcut_manager();
-        
         if let Ok(mut current) = self.current_hotkey.lock() {
             if let Some(hotkey) = current.take() {
-                if global_shortcut_manager.is_registered(&hotkey).unwrap_or(false) {
-                    global_shortcut_manager.unregister(&hotkey)
-                        .map_err(|e| format!("Failed to unregister hotkey: {}", e))?;
-                }
+                self.app_handle.global_shortcut().unregister(&hotkey)
+                    .map_err(|e| format!("Failed to unregister hotkey: {}", e))?;
             }
         }
         

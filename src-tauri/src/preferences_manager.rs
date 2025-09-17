@@ -227,6 +227,9 @@ impl PreferencesManager {
             if let Some(start_minimized) = behavior.get("start_minimized").and_then(|v| v.as_bool()) {
                 prefs.behavior.start_minimized = start_minimized;
             }
+            if let Some(global_hotkey) = behavior.get("global_hotkey").and_then(|v| v.as_str()) {
+                prefs.behavior.global_hotkey = Some(global_hotkey.to_string());
+            }
         }
 
         // Handle direct behavior updates (for compatibility with old system)

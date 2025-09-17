@@ -45,6 +45,7 @@ interface SettingsState {
   minimizeToTray: boolean;
   startupEnabled: boolean;
   startMinimized: boolean;
+  globalHotkey: string | null;
 
   // Actions
   setThemeMode: (mode: ThemeMode) => void;
@@ -53,6 +54,7 @@ interface SettingsState {
   setMinimizeToTray: (enabled: boolean) => Promise<void>;
   setStartupEnabled: (enabled: boolean) => Promise<void>;
   setStartMinimized: (enabled: boolean) => Promise<void>;
+  setGlobalHotkey: (hotkey: string | null) => Promise<void>;
   initializeSettings: () => Promise<void>;
 }
 
@@ -151,6 +153,7 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
   minimizeToTray: false,
   startupEnabled: false,
   startMinimized: true,
+  globalHotkey: null,
 
   setThemeMode: (mode) => {
     // Update UI state immediately
@@ -282,6 +285,40 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
+  setGlobalHotkey: async (hotkey: string | null) => {
+    // Update UI state immediately
+    set({ globalHotkey: hotkey });
+
+    try {
+      // First validate the hotkey format if provided
+      if (hotkey) {
+        const isValid = await invoke('validate_hotkey_format', { hotkey });
+        if (!isValid) {
+          throw new Error('Invalid hotkey format');
+        }
+      }
+
+      // Update preferences
+      await invoke('update_preferences', {
+        updates: {
+          behavior: { global_hotkey: hotkey }
+        }
+      });
+
+      // Register or unregister the hotkey
+      if (hotkey) {
+        await invoke('register_global_hotkey', { hotkey });
+      } else {
+        await invoke('unregister_global_hotkey');
+      }
+    } catch (error) {
+      console.error('Failed to update global hotkey setting:', error);
+      // Revert UI state on error
+      set({ globalHotkey: get().globalHotkey });
+      throw error;
+    }
+  },
+
   initializeSettings: async () => {
     try {
       // Load preferences from backend
@@ -311,6 +348,7 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
         minimizeToTray: prefs.behavior?.minimize_to_tray || false,
         startupEnabled: prefs.behavior?.startup_enabled || false,
         startMinimized: prefs.behavior?.start_minimized ?? true,
+        globalHotkey: prefs.behavior?.global_hotkey || null,
         isCustomAccentColor: hasCustomAccent,
         colors: {
           light: {

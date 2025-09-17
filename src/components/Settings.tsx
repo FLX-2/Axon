@@ -1,9 +1,10 @@
 import React from 'react';
 import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw } from 'lucide-react';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { PATTERNS, STATES, TYPOGRAPHY, SPACING, HEIGHTS } from '../lib/designTokens';
+import { HotkeyInput } from './HotkeyInput';
 
 export const Settings: React.FC = () => {
   const settings = useUnifiedSettingsStore();
@@ -204,6 +205,21 @@ export const Settings: React.FC = () => {
                   `}
                 />
               </button>
+            </div>
+            <div className={PATTERNS.settingItem}>
+              <div className={PATTERNS.labelWithDescription}>
+                <span className={TYPOGRAPHY.label}>Global Hotkey</span>
+                <span className={TYPOGRAPHY.description}>
+                  Set a keyboard shortcut to show/hide the app from anywhere
+                </span>
+              </div>
+              <div className="w-64">
+                <HotkeyInput
+                  value={settings.globalHotkey}
+                  onChange={(hotkey) => settings.setGlobalHotkey(hotkey)}
+                  placeholder="Click to set hotkey..."
+                />
+              </div>
             </div>
             <div className={PATTERNS.settingItem}>
               <div className={PATTERNS.labelWithDescription}>

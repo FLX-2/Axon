@@ -68,7 +68,11 @@ impl HotkeyManager {
         let preferences = preferences_manager.get_preferences().await;
         let minimize_to_tray = preferences.behavior.minimize_to_tray;
 
-        if main_window.is_visible().unwrap_or(false) {
+        if main_window.is_minimized().unwrap_or(false) {
+            // Window is minimized to taskbar, restore it
+            main_window.unminimize().map_err(|e| format!("Failed to unminimize window: {}", e))?;
+            main_window.set_focus().map_err(|e| format!("Failed to focus window: {}", e))?;
+        } else if main_window.is_visible().unwrap_or(true) {
             // Window is visible, hide it
             if minimize_to_tray {
                 // Hide to tray
@@ -78,10 +82,9 @@ impl HotkeyManager {
                 main_window.minimize().map_err(|e| format!("Failed to minimize window: {}", e))?;
             }
         } else {
-            // Window is hidden, show and focus it
+            // Window is hidden (to tray), show it
             main_window.show().map_err(|e| format!("Failed to show window: {}", e))?;
             main_window.set_focus().map_err(|e| format!("Failed to focus window: {}", e))?;
-            main_window.unminimize().map_err(|e| format!("Failed to unminimize window: {}", e))?;
         }
 
         Ok(())

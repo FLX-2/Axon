@@ -25,7 +25,7 @@ export const SearchBar: React.FC = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search apps..."
-          className="w-full pl-10 pr-10 py-1.5 bg-inputBg text-textPrimary text-sm border border-inputBorder rounded-lg
+          className="w-full pl-10 pr-10 py-2 bg-inputBg text-textPrimary text-sm border border-inputBorder rounded-lg
                     focus:outline-none placeholder-textPlaceholder"
         />
         {searchTerm && (

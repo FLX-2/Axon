@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Library, GamepadIcon, Wrench, Music, MonitorPlay, FolderGit2, ChevronRight, Cog, Folder } from 'lucide-react';
+import { Library, GamepadIcon, Wrench, Music, MonitorPlay, FolderGit2, PanelLeftOpen, PanelLeft, Cog, Folder } from 'lucide-react';
 
 interface SidebarProps {
   selectedCategory: string | null;
@@ -27,30 +27,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div 
+    <div
       className={`${
         isExpanded ? 'w-48' : 'w-16'
-      } bg-surfaceSecondary border-r border-border flex flex-col items-center py-4 relative transition-all duration-200`}
+      } bg-surfaceSecondary border-r border-border flex flex-col items-center transition-all duration-200`}
     >
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={`
-          absolute -right-3 top-6
-          w-6 h-6
-          flex items-center justify-center
-          bg-buttonHover
-          border border-border
-          rounded-full
-          hover:bg-surfaceHover
-          transition-all duration-200
-          ${isExpanded ? 'rotate-180' : ''}
-        `}
-        title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
-      >
-        <ChevronRight className="w-4 h-4 text-iconPrimary" />
-      </button>
+      <div className={`w-full flex py-3 ${isExpanded ? 'justify-end pr-3' : 'justify-center'}`}>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`
+            w-10 h-10
+            flex items-center justify-center
+            hover:bg-surfaceHover
+            transition-all duration-200
+            rounded-lg
+          `}
+          title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {isExpanded ? (
+            <PanelLeft className="w-5 h-5 text-iconPrimary" />
+          ) : (
+            <PanelLeftOpen className="w-5 h-5 text-iconPrimary" />
+          )}
+        </button>
+      </div>
 
-      <div className="flex-1 w-full flex flex-col items-center space-y-2">
+      <div className="flex justify-center py-0">
+        <div className={`h-px bg-border ${isExpanded ? 'w-20' : 'w-8'}`}></div>
+      </div>
+      <div className="flex-1 w-full flex flex-col items-center py-1 space-y-2">
         {mainCategories.map(({ id, name, icon: Icon }) => (
           <button
             key={name}
@@ -74,7 +79,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      <div className="w-full pt-4 mt-4 border-t border-border space-y-2">
+      <div className="w-full pt-4 mt-4 space-y-2 pb-4">
+        <div className="flex justify-center pb-2">
+          <div className={`h-px bg-border ${isExpanded ? 'w-20' : 'w-8'}`}></div>
+        </div>
         {bottomCategories.map(({ id, name, icon: Icon }) => (
           <button
             key={name}

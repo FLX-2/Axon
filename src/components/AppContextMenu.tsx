@@ -3,6 +3,7 @@ import { AppInfo } from '../types/app';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
+import { NameInputModal } from './NameInputModal';
 
 interface AppContextMenuProps {
   app: AppInfo;
@@ -19,9 +20,12 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
 }) => {
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showIconMenu, setShowIconMenu] = useState(false);
+  const [showNameMenu, setShowNameMenu] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const categories = ['Games', 'Utilities', 'Media', 'Development', 'Other'];
   const updateAppIcon = useUnifiedAppStore(state => state.updateAppIcon);
+  const updateAppName = useUnifiedAppStore(state => state.updateAppName);
 
   // Calculate if we need to flip the menu direction
   const [menuPosition, setMenuPosition] = useState({ x: position.x, y: position.y });
@@ -60,6 +64,9 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
   }, [position]);
 
   useEffect(() => {
+    // Don't close the context menu if the name modal is open
+    if (showNameModal) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
@@ -70,7 +77,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose]);
+  }, [onClose, showNameModal]);
 
   const handleRemoveIcon = async () => {
     try {
@@ -85,6 +92,21 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
     }
   };
 
+  const handleCustomName = () => {
+    setShowNameModal(true);
+  };
+
+  const handleNameSubmit = (name: string) => {
+    updateAppName(app.path, name);
+    setShowNameModal(false);
+    onClose();
+  };
+
+  const handleResetName = () => {
+    updateAppName(app.path, null);
+    onClose();
+  };
+
   const subMenuStyle = {
     minWidth: '140px',
     ...(flipHorizontal ? { right: '100%', left: 'auto' } : { left: '100%' }),
@@ -93,13 +115,13 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
 
   return (
     <>
-      <div 
+      <div
         ref={menuRef}
         className="fixed z-50 bg-surfaceSecondary border border-border rounded shadow-lg"
-        style={{ 
-          left: menuPosition.x, 
+        style={{
+          left: menuPosition.x,
           top: menuPosition.y,
-          minWidth: '160px' 
+          minWidth: '160px'
         }}
       >
         {/* Move to Category Option */}
@@ -146,6 +168,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
             onMouseEnter={() => {
               setShowIconMenu(true);
               setShowMoveMenu(false);
+              setShowNameMenu(false);
             }}
             onMouseLeave={() => setShowIconMenu(false)}
           >
@@ -154,7 +177,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
           </button>
 
           {showIconMenu && (
-            <div 
+            <div
               className="absolute bg-surfaceSecondary border border-border rounded shadow-lg"
               style={subMenuStyle}
               onMouseEnter={() => setShowIconMenu(true)}
@@ -205,7 +228,53 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
             </div>
           )}
         </div>
+
+        {/* Name Management */}
+        <div className="relative">
+          <button
+            className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm flex items-center justify-between"
+            onMouseEnter={() => {
+              setShowNameMenu(true);
+              setShowMoveMenu(false);
+              setShowIconMenu(false);
+            }}
+            onMouseLeave={() => setShowNameMenu(false)}
+          >
+            <span>Set Name</span>
+            {flipHorizontal ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+
+          {showNameMenu && (
+            <div
+              className="absolute bg-surfaceSecondary border border-border rounded shadow-lg"
+              style={subMenuStyle}
+              onMouseEnter={() => setShowNameMenu(true)}
+              onMouseLeave={() => setShowNameMenu(false)}
+            >
+              <button
+                className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm"
+                onClick={handleCustomName}
+              >
+                Custom Name
+              </button>
+              <button
+                className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm"
+                onClick={handleResetName}
+              >
+                Reset Name
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      <NameInputModal
+        isOpen={showNameModal}
+        onClose={() => setShowNameModal(false)}
+        onSubmit={handleNameSubmit}
+        currentName={app.name}
+        title="Set Custom Name"
+      />
     </>
   );
 };

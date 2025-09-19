@@ -28,6 +28,7 @@ pub struct BehaviorSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderSettings {
     pub custom_icons: HashMap<String, String>, // folder_path -> relative_icon_path
+    pub custom_names: HashMap<String, String>, // folder_path -> custom_name
     pub custom_folders: Vec<serde_json::Value>, // custom folder list
 }
 
@@ -36,6 +37,7 @@ pub struct AppSettings {
     pub pinned: Vec<String>,
     pub categories: HashMap<String, String>,
     pub custom_icons: HashMap<String, String>, // app_path -> relative_icon_path
+    pub custom_names: HashMap<String, String>, // app_path -> custom_name
     pub last_accessed: HashMap<String, String>, // app_path -> timestamp
     pub view_mode: String, // "grid" or "list"
 }
@@ -67,17 +69,19 @@ impl Default for AppPreferences {
                 minimize_to_tray: false,
                 startup_enabled: false,
                 start_minimized: true,
-                global_hotkey: Some("CmdOrCtrl+Shift+A".to_string()),
+                global_hotkey: None,
             },
             apps: AppSettings {
                 pinned: Vec::new(),
                 categories: HashMap::new(),
                 custom_icons: HashMap::new(),
+                custom_names: HashMap::new(),
                 last_accessed: HashMap::new(),
                 view_mode: "grid".to_string(),
             },
             folders: FolderSettings {
                 custom_icons: HashMap::new(),
+                custom_names: HashMap::new(),
                 custom_folders: Vec::new(),
             },
             metadata: Metadata {
@@ -277,6 +281,13 @@ impl PreferencesManager {
                     })
                     .collect();
             }
+            if let Some(custom_names) = apps.get("custom_names").and_then(|v| v.as_object()) {
+                prefs.apps.custom_names = custom_names.iter()
+                    .filter_map(|(k, v)| {
+                        v.as_str().map(|s| (k.clone(), s.to_string()))
+                    })
+                    .collect();
+            }
 
         }
 
@@ -284,6 +295,13 @@ impl PreferencesManager {
         if let Some(folders) = updates.get("folders").and_then(|v| v.as_object()) {
             if let Some(custom_icons) = folders.get("custom_icons").and_then(|v| v.as_object()) {
                 prefs.folders.custom_icons = custom_icons.iter()
+                    .filter_map(|(k, v)| {
+                        v.as_str().map(|s| (k.clone(), s.to_string()))
+                    })
+                    .collect();
+            }
+            if let Some(custom_names) = folders.get("custom_names").and_then(|v| v.as_object()) {
+                prefs.folders.custom_names = custom_names.iter()
                     .filter_map(|(k, v)| {
                         v.as_str().map(|s| (k.clone(), s.to_string()))
                     })

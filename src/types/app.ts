@@ -2,6 +2,7 @@ export type AppCategory = 'Games' | 'Utilities' | 'Media' | 'Development' | 'Oth
 
 export interface AppInfo {
   name: string;
+  originalName?: string;
   path: string;
   icon?: string | null;
   customIcon?: string;

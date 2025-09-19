@@ -6,10 +6,12 @@ import { FolderInfo } from '../types/folder';
 
 interface FolderState {
   folders: FolderInfo[];
+  customNames: Record<string, string>;
   addFolder: () => Promise<void>;
   openFolder: (path: string) => Promise<void>;
   removeFolder: (path: string) => void;
   updateFolderIcon: (path: string, iconData: string | null) => Promise<void>;
+  updateFolderName: (path: string, name: string | null) => Promise<void>;
   getFolder: (path: string) => FolderInfo | undefined;
   initializeFolders: () => Promise<void>;
 }
@@ -31,6 +33,7 @@ const getDefaultFolders = (): FolderInfo[] => {
 
 export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
   folders: getDefaultFolders(),
+  customNames: {},
 
   addFolder: async () => {
     try {
@@ -48,7 +51,7 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
         const exists = state.folders.some(folder => folder.path === selected);
 
         if (!exists) {
-          const newFolders = [...state.folders, { name, path: selected }];
+          const newFolders = [...state.folders, { name, originalName: name, path: selected }];
 
           // Update UI state immediately
           set({ folders: newFolders });
@@ -162,6 +165,52 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
     }
   },
 
+  updateFolderName: async (path: string, name: string | null) => {
+    const state = get();
+    const newCustomNames = { ...state.customNames };
+
+    if (name) {
+      // Setting a custom name
+      newCustomNames[path] = name;
+    } else {
+      // Reset to original name - remove from custom names
+      delete newCustomNames[path];
+    }
+
+    const newFolders = state.folders.map(folder =>
+      folder.path === path
+        ? { ...folder, name: name || folder.originalName }
+        : folder
+    );
+
+    // Update UI state immediately
+    set({
+      customNames: newCustomNames,
+      folders: newFolders
+    });
+
+    // Send to backend
+    try {
+      const updates: any = {
+        folders: {
+          custom_folders: newFolders.filter(folder =>
+            !getDefaultFolders().some(defaultFolder => defaultFolder.path === folder.path)
+          ),
+          custom_names: newCustomNames
+        }
+      };
+
+      await invoke('update_preferences', { updates });
+    } catch (error) {
+      console.error('Failed to update folder names:', error);
+      // Revert UI state on error
+      set({
+        customNames: state.customNames,
+        folders: state.folders
+      });
+    }
+  },
+
   getFolder: (path: string) => {
     return get().folders.find(folder => folder.path === path);
   },
@@ -175,6 +224,7 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
       if (prefs.folders?.custom_folders) {
         const customFolders = prefs.folders.custom_folders;
         const customIcons = prefs.folders.custom_icons || {};
+        const customNames = prefs.folders.custom_names || {};
         const defaultFolders = getDefaultFolders();
 
         // Create a map of existing folders by path
@@ -188,14 +238,18 @@ export const useUnifiedFolderStore = create<FolderState>((set, get) => ({
         // Add or override with custom folders
         customFolders.forEach((folder: any) => {
           const folderInfo: FolderInfo = {
-            name: folder.name,
+            name: customNames[folder.path] || folder.name,
+            originalName: folder.name,
             path: folder.path,
             icon: customIcons[folder.path] || folder.icon
           };
           folderMap.set(folder.path, folderInfo);
         });
 
-        set({ folders: Array.from(folderMap.values()) });
+        set({
+          folders: Array.from(folderMap.values()),
+          customNames
+        });
       }
     } catch (error) {
       console.error('Failed to initialize folders:', error);

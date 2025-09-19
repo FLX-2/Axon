@@ -3,6 +3,7 @@ import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { FolderInfo } from '../types/folder';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
+import { NameInputModal } from './NameInputModal';
 
 interface FolderContextMenuProps {
   folder: FolderInfo;
@@ -18,8 +19,11 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
   onRemove
 }) => {
   const [showIconMenu, setShowIconMenu] = useState(false);
+  const [showNameMenu, setShowNameMenu] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const updateFolderIcon = useUnifiedFolderStore(state => state.updateFolderIcon);
+  const updateFolderName = useUnifiedFolderStore(state => state.updateFolderName);
 
   // Calculate if we need to flip the menu direction
   const [menuPosition, setMenuPosition] = useState({ x: position.x, y: position.y });
@@ -58,6 +62,9 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
   }, [position]);
 
   useEffect(() => {
+    // Don't close the context menu if the name modal is open
+    if (showNameModal) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
@@ -68,7 +75,7 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose]);
+  }, [onClose, showNameModal]);
 
   const handleRemoveIcon = async () => {
     try {
@@ -80,6 +87,21 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
     } catch (error) {
       console.error('Failed to remove custom folder icon:', error);
     }
+  };
+
+  const handleCustomName = () => {
+    setShowNameModal(true);
+  };
+
+  const handleNameSubmit = (name: string) => {
+    updateFolderName(folder.path, name);
+    setShowNameModal(false);
+    onClose();
+  };
+
+  const handleResetName = () => {
+    updateFolderName(folder.path, null);
+    onClose();
   };
 
   const subMenuStyle = {
@@ -102,7 +124,10 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
       <div className="relative">
         <button
           className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm flex items-center justify-between"
-          onMouseEnter={() => setShowIconMenu(true)}
+          onMouseEnter={() => {
+            setShowIconMenu(true);
+            setShowNameMenu(false);
+          }}
           onMouseLeave={() => setShowIconMenu(false)}
         >
           <span>Set Icon</span>
@@ -110,7 +135,7 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
         </button>
 
         {showIconMenu && (
-          <div 
+          <div
             className="absolute bg-surfaceSecondary border border-border rounded shadow-lg"
             style={subMenuStyle}
             onMouseEnter={() => setShowIconMenu(true)}
@@ -130,7 +155,7 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
                       const dataUrl = e.target?.result as string;
                       // Extract base64 data from data URL (remove "data:image/...;base64," prefix)
                       const base64data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-                      
+
                       try {
                         const processedIcon = await invoke('save_custom_folder_icon', { folderPath: folder.path, iconData: base64data });
                         updateFolderIcon(folder.path, processedIcon as string);
@@ -156,6 +181,43 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
           </div>
         )}
       </div>
+
+      {/* Name Management */}
+      <div className="relative">
+        <button
+          className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm flex items-center justify-between"
+          onMouseEnter={() => {
+            setShowNameMenu(true);
+            setShowIconMenu(false);
+          }}
+          onMouseLeave={() => setShowNameMenu(false)}
+        >
+          <span>Set Name</span>
+          {flipHorizontal ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+
+        {showNameMenu && (
+          <div
+            className="absolute bg-surfaceSecondary border border-border rounded shadow-lg"
+            style={subMenuStyle}
+            onMouseEnter={() => setShowNameMenu(true)}
+            onMouseLeave={() => setShowNameMenu(false)}
+          >
+            <button
+              className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm"
+              onClick={handleCustomName}
+            >
+              Custom Name
+            </button>
+            <button
+              className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm"
+              onClick={handleResetName}
+            >
+              Reset Name
+            </button>
+          </div>
+        )}
+      </div>
       
       <button
         className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm flex items-center gap-2 text-red-500"
@@ -167,6 +229,14 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
         <Trash2 className="w-4 h-4" />
         <span>Remove Folder</span>
       </button>
+
+      <NameInputModal
+        isOpen={showNameModal}
+        onClose={() => setShowNameModal(false)}
+        onSubmit={handleNameSubmit}
+        currentName={folder.name}
+        title="Set Custom Name"
+      />
     </div>
   );
 };

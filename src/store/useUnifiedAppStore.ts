@@ -65,6 +65,7 @@ interface AppState {
   isLoading: boolean;
   isGridView: boolean;
   customIcons: Record<string, string>;
+  customNames: Record<string, string>;
   pinnedApps: string[];
   lastAccessed: Record<string, string>;
   categories: Record<string, string>;
@@ -79,6 +80,7 @@ interface AppState {
   refreshApps: () => Promise<void>;
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => Promise<void>;
+  updateAppName: (path: string, name: string | null) => Promise<void>;
   initializeApps: () => Promise<void>;
 }
 
@@ -88,6 +90,7 @@ const initialState = {
   isLoading: true,
   isGridView: true,
   customIcons: {},
+  customNames: {},
   pinnedApps: [],
   lastAccessed: {},
   categories: {},
@@ -291,9 +294,12 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
         const isPinned = state.pinnedApps.includes(newApp.path);
         const lastAccessed = state.lastAccessed[newApp.path];
         const customIcon = state.customIcons[newApp.path];
+        const customName = state.customNames[newApp.path];
 
         return {
           ...newApp,
+          originalName: newApp.name || '', // Store the original name from system
+          name: customName || newApp.name || '',
           category,
           isPinned,
           lastAccessed,
@@ -327,9 +333,12 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
         const category = state.categories[newApp.path] || newApp.category;
         const isPinned = state.pinnedApps.includes(newApp.path);
         const lastAccessed = state.lastAccessed[newApp.path];
+        const customName = state.customNames[newApp.path];
 
         return {
           ...newApp,
+          originalName: newApp.name || '', // Store the original name from system
+          name: customName || newApp.name || '',
           category,
           isPinned,
           lastAccessed,
@@ -455,6 +464,51 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  updateAppName: async (path: string, name: string | null) => {
+    const state = get();
+    const newCustomNames = { ...state.customNames };
+
+    if (name) {
+      // Setting a custom name
+      newCustomNames[path] = name;
+    } else {
+      // Reset to original name - remove from custom names
+      delete newCustomNames[path];
+    }
+
+    // Update UI state
+    set({
+      customNames: newCustomNames,
+      apps: state.apps.map(app =>
+        app.path === path
+          ? { ...app, name: name || (app.originalName || app.name) } // Use custom name or reset to original
+          : app
+      )
+    });
+
+    // Update preferences with custom names mapping
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            custom_names: newCustomNames
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update custom names preferences:', error);
+      // Revert UI state on error
+      set({
+        customNames: state.customNames,
+        apps: state.apps.map(app =>
+          app.path === path
+            ? { ...app, name: state.customNames[path] || (app.originalName || app.name) }
+            : app
+        )
+      });
+    }
+  },
+
 
   initializeApps: async () => {
     try {
@@ -465,6 +519,7 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
       if (prefs.apps) {
         set({
           customIcons: prefs.apps.custom_icons || {},
+          customNames: prefs.apps.custom_names || {},
           pinnedApps: prefs.apps.pinned || [],
           categories: prefs.apps.categories || {},
           lastAccessed: prefs.apps.last_accessed || {},

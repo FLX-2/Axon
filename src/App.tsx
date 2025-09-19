@@ -47,7 +47,7 @@ function App() {
             onSelectCategory={setSelectedCategory}
           />
           <div className="flex-1 flex flex-col overflow-hidden">
-            <SearchBar />
+            <SearchBar selectedCategory={selectedCategory} />
             <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
               {selectedCategory === 'Settings' ? (
                 <Settings />

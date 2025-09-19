@@ -1,10 +1,16 @@
 import React from 'react';
-import { Search, LayoutGrid, List, X, Plus } from 'lucide-react';
+import { Search, LayoutGrid, List, X, Plus, FolderPlus } from 'lucide-react';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
+import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
 import { invoke } from '@tauri-apps/api/tauri';
 
-export const SearchBar: React.FC = () => {
+interface SearchBarProps {
+  selectedCategory?: string | null;
+}
+
+export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
   const { searchTerm, setSearchTerm, isGridView, toggleView, refreshApps } = useUnifiedAppStore();
+  const { addFolder } = useUnifiedFolderStore();
 
   const handleAddApp = async () => {
     try {
@@ -13,6 +19,22 @@ export const SearchBar: React.FC = () => {
       refreshApps();
     } catch (error) {
       console.error('Failed to add app:', error);
+    }
+  };
+
+  const handleAddFolder = async () => {
+    try {
+      await addFolder();
+    } catch (error) {
+      console.error('Failed to add folder:', error);
+    }
+  };
+
+  const handleAdd = () => {
+    if (selectedCategory === 'Folders') {
+      handleAddFolder();
+    } else {
+      handleAddApp();
     }
   };
 
@@ -51,11 +73,15 @@ export const SearchBar: React.FC = () => {
         </button>
         <div className="w-px h-5 bg-border mx-1"></div>
         <button
-          onClick={handleAddApp}
+          onClick={handleAdd}
           className="p-2.5 hover:bg-buttonHover rounded-lg transition-colors"
-          title="Add custom app"
+          title={selectedCategory === 'Folders' ? "Add folder" : "Add custom app"}
         >
-          <Plus className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
+          {selectedCategory === 'Folders' ? (
+            <FolderPlus className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
+          ) : (
+            <Plus className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
+          )}
         </button>
       </div>
     </div>

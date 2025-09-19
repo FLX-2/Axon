@@ -41,24 +41,28 @@ export const Folders: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-3">
         <h2 className="text-sm font-semibold text-textSecondary">Folders</h2>
-        <button
-          onClick={handleAddFolder}
-          className="p-2 hover:bg-surfaceHover rounded-lg transition-colors"
-          title="Add folder"
-        >
-          <FolderPlus className="w-5 h-5 text-iconPrimary hover:text-iconSecondary" />
-        </button>
       </div>
 
-      <div className={`
-        ${isGridView 
-          ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4' 
-          : 'space-y-2'
-        }
-      `}>
-        {folders.map((folder) => (
+      {folders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 bg-surfaceHover rounded-full flex items-center justify-center mb-4">
+            <Folder className="w-8 h-8 text-iconSecondary" />
+          </div>
+          <h3 className="text-lg font-medium text-textPrimary mb-2">No folders yet</h3>
+          <p className="text-sm text-textSecondary mb-4">
+            Add your first folder using the button above
+          </p>
+        </div>
+      ) : (
+        <div className={`
+          ${isGridView
+            ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'
+            : 'space-y-2'
+          }
+        `}>
+          {folders.map((folder) => (
           <div
             key={folder.path}
             onContextMenu={(e) => handleContextMenu(e, folder)}
@@ -110,7 +114,8 @@ export const Folders: React.FC = () => {
             </button>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {contextMenu && (
         <>

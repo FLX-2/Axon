@@ -1,11 +1,100 @@
 import React from 'react';
 import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard, Folder, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Folder, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { PATTERNS, STATES, TYPOGRAPHY, SPACING, HEIGHTS } from '../lib/designTokens';
 import { HotkeyInput } from './HotkeyInput';
 import { invoke } from '@tauri-apps/api';
+import { useState } from 'react';
+import { AppInfo } from '../types/app';
+
+// Hidden Apps Expandable Component
+const HiddenAppsExpandable: React.FC<{
+  removedApps: string[];
+  allApps: AppInfo[];
+  onRestoreApp: (path: string) => Promise<void>;
+}> = ({ removedApps, allApps, onRestoreApp }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(3);
+
+  const visibleApps = isExpanded ? removedApps : removedApps.slice(0, visibleCount);
+  const hasHiddenApps = removedApps.length > visibleCount && !isExpanded;
+
+  return (
+    <div>
+      <div className="flex items-start mb-6">
+        <div className={PATTERNS.labelWithDescription}>
+          <span className={TYPOGRAPHY.label}>Hidden Applications</span>
+          <span className={TYPOGRAPHY.description}>
+            Apps you've removed from your main list. Click restore to bring them back.
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {visibleApps.map((appPath) => {
+          // Find the app info from the full apps list
+          const appInfo = allApps.find(app => app.path === appPath) ||
+            // If not found in current apps, create a basic info object
+            { path: appPath, name: appPath.split('\\').pop()?.split('.')[0] || 'Unknown App' };
+
+          return (
+            <div
+              key={appPath}
+              className="flex items-center justify-start p-3 bg-surfaceSecondary rounded-lg"
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-8 h-8 bg-surfaceHover rounded flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-4 h-4 text-textSecondary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-medium text-textPrimary block truncate">
+                    {appInfo.name}
+                  </span>
+                  <div className="text-xs text-textSecondary truncate" title={appPath}>
+                    {appPath}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => onRestoreApp(appPath)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-sm transition-colors flex-shrink-0 ml-3"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Restore
+              </button>
+            </div>
+          );
+        })}
+
+        {/* Show more/less buttons */}
+        {hasHiddenApps && !isExpanded && (
+          <div className="flex justify-center mt-3">
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-surfaceSecondary hover:bg-surfaceHover transition-colors rounded-lg text-sm text-textSecondary"
+            >
+              <ChevronDown className="w-4 h-4" />
+              Show {removedApps.length - visibleCount} more
+            </button>
+          </div>
+        )}
+
+        {isExpanded && (
+          <div className="flex justify-center mt-3">
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-2 px-3 py-2 bg-surfaceSecondary hover:bg-surfaceHover transition-colors rounded-lg text-sm text-textSecondary"
+            >
+              <ChevronUp className="w-4 h-4" />
+              Show less
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const Settings: React.FC = () => {
   const settings = useUnifiedSettingsStore();
@@ -268,50 +357,11 @@ export const Settings: React.FC = () => {
 
             {/* Hidden Applications */}
             {appStore.removedApps.length > 0 && (
-              <div className={PATTERNS.settingItem}>
-                <div className={PATTERNS.labelWithDescription}>
-                  <span className={TYPOGRAPHY.label}>Hidden Applications</span>
-                  <span className={TYPOGRAPHY.description}>
-                    Apps you've removed from your main list. Click restore to bring them back.
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {appStore.removedApps.map((appPath) => {
-                    // Find the app info from the full apps list
-                    const appInfo = appStore.apps.find(app => app.path === appPath) ||
-                      // If not found in current apps, create a basic info object
-                      { path: appPath, name: appPath.split('\\').pop()?.split('.')[0] || 'Unknown App' };
-
-                    return (
-                      <div
-                        key={appPath}
-                        className="flex items-center justify-between p-3 bg-surfaceSecondary rounded-lg"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-8 h-8 bg-surfaceHover rounded flex items-center justify-center flex-shrink-0">
-                            <Trash2 className="w-4 h-4 text-textSecondary" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="text-sm font-medium text-textPrimary block truncate">
-                              {appInfo.name}
-                            </span>
-                            <div className="text-xs text-textSecondary truncate max-w-xs" title={appPath}>
-                              {appPath.length > 50 ? `${appPath.substring(0, 47)}...` : appPath}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => appStore.restoreApp(appPath)}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-sm transition-colors flex-shrink-0 ml-3"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          Restore
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <HiddenAppsExpandable
+                removedApps={appStore.removedApps}
+                allApps={appStore.apps}
+                onRestoreApp={appStore.restoreApp}
+              />
             )}
           </div>
         </div>

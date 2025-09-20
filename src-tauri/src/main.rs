@@ -903,6 +903,16 @@ fn validate_hotkey_format(hotkey: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn open_startup_folder() -> Result<(), String> {
+    let appdata = std::env::var("APPDATA")
+        .map_err(|_| "Failed to get APPDATA environment variable")?;
+    let axon_folder = std::path::Path::new(&appdata)
+        .join("Microsoft\\Windows\\Start Menu\\Programs");
+
+    shell_open(axon_folder.to_string_lossy().to_string()).await
+}
+
+#[tauri::command]
 async fn add_custom_app() -> Result<(), String> {
     use tauri::api::dialog;
 
@@ -1285,7 +1295,8 @@ fn main() {
                 unregister_global_hotkey,
                 validate_hotkey_format,
                 // Add custom app
-                add_custom_app
+                add_custom_app,
+                open_startup_folder
             ]);
 
         log_error("Starting application...");

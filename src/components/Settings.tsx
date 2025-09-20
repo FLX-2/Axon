@@ -1,10 +1,11 @@
 import React from 'react';
 import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard } from 'lucide-react';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard, Folder } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { PATTERNS, STATES, TYPOGRAPHY, SPACING, HEIGHTS } from '../lib/designTokens';
 import { HotkeyInput } from './HotkeyInput';
+import { invoke } from '@tauri-apps/api';
 
 export const Settings: React.FC = () => {
   const settings = useUnifiedSettingsStore();
@@ -235,6 +236,21 @@ export const Settings: React.FC = () => {
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {isRefreshing ? 'Refreshing...' : 'Reset App List'}
+              </button>
+            </div>
+            <div className={PATTERNS.settingItem}>
+              <div className={PATTERNS.labelWithDescription}>
+                <span className={TYPOGRAPHY.label}>Open Startup Folder</span>
+                <span className={TYPOGRAPHY.description}>
+                  Open the folder where the application shortcuts are stored
+                </span>
+              </div>
+              <button
+                onClick={() => invoke('open_startup_folder')}
+                className={PATTERNS.button}
+              >
+                <Folder className="w-4 h-4" />
+                Open Folder
               </button>
             </div>
           </div>

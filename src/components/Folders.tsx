@@ -47,7 +47,7 @@ export const Folders: React.FC = () => {
 
       {folders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-16 h-16 bg-surfaceHover rounded-full flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-surfaceHover rounded-lg flex items-center justify-center mb-4">
             <Folder className="w-8 h-8 text-iconSecondary" />
           </div>
           <h3 className="text-lg font-medium text-textPrimary mb-2">No folders yet</h3>

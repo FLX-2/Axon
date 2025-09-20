@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppInfo } from '../types/app';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Trash2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 
@@ -30,6 +30,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
   const categories = ['Games', 'Utilities', 'Media', 'Development', 'Other'];
   const updateAppIcon = useUnifiedAppStore(state => state.updateAppIcon);
   const updateAppName = useUnifiedAppStore(state => state.updateAppName);
+  const removeApp = useUnifiedAppStore(state => state.removeApp);
 
   // Calculate if we need to flip the menu direction
   const [menuPosition, setMenuPosition] = useState({ x: position.x, y: position.y });
@@ -266,6 +267,19 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
             </div>
           )}
         </div>
+
+        {/* App Management */}
+        <div className="border-t border-border my-1"></div>
+        <button
+          className="w-full text-left px-2 py-1 hover:bg-red-500/10 text-sm flex items-center gap-2 text-red-500"
+          onClick={() => {
+            removeApp(app.path);
+            onClose();
+          }}
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Remove App</span>
+        </button>
       </div>
 
     </>

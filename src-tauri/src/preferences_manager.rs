@@ -40,6 +40,7 @@ pub struct AppSettings {
     pub custom_names: HashMap<String, String>, // app_path -> custom_name
     pub last_accessed: HashMap<String, String>, // app_path -> timestamp
     pub view_mode: String, // "grid" or "list"
+    pub removed: Vec<String>, // app_paths that have been removed/hidden
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +79,7 @@ impl Default for AppPreferences {
                 custom_names: HashMap::new(),
                 last_accessed: HashMap::new(),
                 view_mode: "grid".to_string(),
+                removed: Vec::new(),
             },
             folders: FolderSettings {
                 custom_icons: HashMap::new(),

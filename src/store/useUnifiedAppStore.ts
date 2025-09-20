@@ -69,6 +69,7 @@ interface AppState {
   pinnedApps: string[];
   lastAccessed: Record<string, string>;
   categories: Record<string, string>;
+  removedApps: string[];
   setApps: (apps: AppInfo[]) => void;
   setSearchTerm: (term: string) => void;
   toggleView: () => void;
@@ -81,6 +82,8 @@ interface AppState {
   loadAppIcon: (path: string) => Promise<void>;
   updateAppIcon: (path: string, iconData: string | null) => Promise<void>;
   updateAppName: (path: string, name: string | null) => Promise<void>;
+  removeApp: (path: string) => Promise<void>;
+  restoreApp: (path: string) => Promise<void>;
   initializeApps: () => Promise<void>;
 }
 
@@ -94,6 +97,7 @@ const initialState = {
   pinnedApps: [],
   lastAccessed: {},
   categories: {},
+  removedApps: [],
 };
 
 export const useUnifiedAppStore = create<AppState>((set, get) => ({
@@ -307,12 +311,15 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
         };
       });
 
+      // Filter out removed apps
+      const visibleApps = updatedApps.filter(app => !state.removedApps.includes(app.path));
+
       // Set apps without icons first for immediate display
-      set({ apps: updatedApps, isLoading: false });
+      set({ apps: visibleApps, isLoading: false });
 
       // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(updatedApps, (updatedAppsWithIcons) => {
+        loadIconsProgressively(visibleApps, (updatedAppsWithIcons) => {
           set({ apps: updatedAppsWithIcons });
         });
       });
@@ -346,12 +353,15 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
         };
       });
 
+      // Filter out removed apps
+      const visibleApps = updatedApps.filter(app => !state.removedApps.includes(app.path));
+
       // Set apps without icons first for immediate display
-      set({ apps: updatedApps, isLoading: false });
+      set({ apps: visibleApps, isLoading: false });
 
       // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(updatedApps, (updatedAppsWithIcons) => {
+        loadIconsProgressively(visibleApps, (updatedAppsWithIcons) => {
           set({ apps: updatedAppsWithIcons });
         });
       });
@@ -509,6 +519,61 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  removeApp: async (path: string) => {
+    const state = get();
+    const newRemovedApps = [...state.removedApps, path];
+
+    // Update UI state immediately
+    set({
+      removedApps: newRemovedApps,
+      apps: state.apps.filter(app => app.path !== path)
+    });
+
+    // Save to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            removed: newRemovedApps
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to save removed apps:', error);
+      // Revert UI state on error
+      set({
+        removedApps: state.removedApps,
+        apps: state.apps
+      });
+    }
+  },
+
+  restoreApp: async (path: string) => {
+    const state = get();
+    const newRemovedApps = state.removedApps.filter(p => p !== path);
+
+    // Update UI state immediately
+    set({
+      removedApps: newRemovedApps
+    });
+
+    // Save to backend
+    try {
+      await invoke('update_preferences', {
+        updates: {
+          apps: {
+            removed: newRemovedApps
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to save restored apps:', error);
+      // Revert UI state on error
+      set({
+        removedApps: state.removedApps
+      });
+    }
+  },
 
   initializeApps: async () => {
     try {
@@ -523,7 +588,8 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
           pinnedApps: prefs.apps.pinned || [],
           categories: prefs.apps.categories || {},
           lastAccessed: prefs.apps.last_accessed || {},
-          isGridView: prefs.apps.view_mode !== 'list'
+          isGridView: prefs.apps.view_mode !== 'list',
+          removedApps: prefs.apps.removed || []
         });
       }
     } catch (error) {

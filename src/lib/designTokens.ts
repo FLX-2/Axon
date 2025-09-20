@@ -156,10 +156,10 @@ export const PATTERNS = {
   title: `${TYPOGRAPHY.title}`,
   
   /** Section header pattern */
-  sectionHeader: `${TYPOGRAPHY.header} ${LAYOUTS.iconText}`,
+  sectionHeader: `text-base font-semibold ${LAYOUTS.iconText}`,
   
   /** Setting item pattern */
-  settingItem: `${LAYOUTS.settingItem} py-2`,
+  settingItem: `flex items-start justify-between py-2`,
   
   /** Label with description pattern */
   labelWithDescription: `${LAYOUTS.labelColumn} gap-1`,

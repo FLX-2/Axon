@@ -1,7 +1,7 @@
 import React from 'react';
 import { useUnifiedSettingsStore } from '../store/useUnifiedSettingsStore';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard, Folder } from 'lucide-react';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Palette, RotateCcw, MoonStar, RefreshCw, Keyboard, Folder, Trash2 } from 'lucide-react';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { PATTERNS, STATES, TYPOGRAPHY, SPACING, HEIGHTS } from '../lib/designTokens';
 import { HotkeyInput } from './HotkeyInput';
@@ -26,10 +26,11 @@ export const Settings: React.FC = () => {
   return (
     <div className={SPACING.container}>
       <div className={SPACING.section}>
+        {/* Appearance & Personalization */}
         <div className={SPACING.items}>
           <h3 className={PATTERNS.sectionHeader}>
             <Palette className="w-4 h-4" />
-            Customization
+            Appearance
           </h3>
           <div className={SPACING.items}>
             <div className={PATTERNS.settingItem}>
@@ -73,7 +74,7 @@ export const Settings: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center gap-4">
-                <div 
+                <div
                   className={`${HEIGHTS.colorPreview} rounded-lg border border-surfaceSecondary`}
                   style={{ backgroundColor: activeColors.accent }}
                 />
@@ -105,10 +106,11 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
+        {/* Behavior & Startup */}
         <div className={SPACING.items}>
           <h3 className={PATTERNS.sectionHeader}>
             <SettingsIcon className="w-4 h-4" />
-            Application
+            Behavior
           </h3>
           <div className={SPACING.items}>
             <div className={PATTERNS.settingItem}>
@@ -182,7 +184,7 @@ export const Settings: React.FC = () => {
                   if (!settings.startupEnabled) {
                     return;
                   }
-                  
+
                   try {
                     await settings.setStartMinimized(!settings.startMinimized);
                   } catch (error) {
@@ -193,8 +195,8 @@ export const Settings: React.FC = () => {
                 disabled={!settings.startupEnabled}
                 className={`
                   relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                  ${!settings.startupEnabled 
-                    ? 'opacity-70 cursor-not-allowed bg-surfaceSecondary' 
+                  ${!settings.startupEnabled
+                    ? 'opacity-70 cursor-not-allowed bg-surfaceSecondary'
                     : settings.startMinimized ? 'bg-accent' : 'bg-surfaceSecondary'
                   }
                 `}
@@ -224,6 +226,31 @@ export const Settings: React.FC = () => {
             </div>
             <div className={PATTERNS.settingItem}>
               <div className={PATTERNS.labelWithDescription}>
+                <span className={TYPOGRAPHY.label}>Open Startup Folder</span>
+                <span className={TYPOGRAPHY.description}>
+                  Open the folder where the application shortcuts are stored
+                </span>
+              </div>
+              <button
+                onClick={() => invoke('open_startup_folder')}
+                className={PATTERNS.button}
+              >
+                <Folder className="w-4 h-4" />
+                Open Folder
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* App Management */}
+        <div className={SPACING.items}>
+          <h3 className={PATTERNS.sectionHeader}>
+            <RefreshCw className="w-4 h-4" />
+            App Management
+          </h3>
+          <div className={SPACING.items}>
+            <div className={PATTERNS.settingItem}>
+              <div className={PATTERNS.labelWithDescription}>
                 <span className={TYPOGRAPHY.label}>Reset App List</span>
                 <span className={TYPOGRAPHY.description}>
                   Refresh and rebuild the list of available applications
@@ -238,21 +265,54 @@ export const Settings: React.FC = () => {
                 {isRefreshing ? 'Refreshing...' : 'Reset App List'}
               </button>
             </div>
-            <div className={PATTERNS.settingItem}>
-              <div className={PATTERNS.labelWithDescription}>
-                <span className={TYPOGRAPHY.label}>Open Startup Folder</span>
-                <span className={TYPOGRAPHY.description}>
-                  Open the folder where the application shortcuts are stored
-                </span>
+
+            {/* Hidden Applications */}
+            {appStore.removedApps.length > 0 && (
+              <div className={PATTERNS.settingItem}>
+                <div className={PATTERNS.labelWithDescription}>
+                  <span className={TYPOGRAPHY.label}>Hidden Applications</span>
+                  <span className={TYPOGRAPHY.description}>
+                    Apps you've removed from your main list. Click restore to bring them back.
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {appStore.removedApps.map((appPath) => {
+                    // Find the app info from the full apps list
+                    const appInfo = appStore.apps.find(app => app.path === appPath) ||
+                      // If not found in current apps, create a basic info object
+                      { path: appPath, name: appPath.split('\\').pop()?.split('.')[0] || 'Unknown App' };
+
+                    return (
+                      <div
+                        key={appPath}
+                        className="flex items-center justify-between p-3 bg-surfaceSecondary rounded-lg"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 bg-surfaceHover rounded flex items-center justify-center flex-shrink-0">
+                            <Trash2 className="w-4 h-4 text-textSecondary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm font-medium text-textPrimary block truncate">
+                              {appInfo.name}
+                            </span>
+                            <div className="text-xs text-textSecondary truncate max-w-xs" title={appPath}>
+                              {appPath.length > 50 ? `${appPath.substring(0, 47)}...` : appPath}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => appStore.restoreApp(appPath)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-sm transition-colors flex-shrink-0 ml-3"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Restore
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <button
-                onClick={() => invoke('open_startup_folder')}
-                className={PATTERNS.button}
-              >
-                <Folder className="w-4 h-4" />
-                Open Folder
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>

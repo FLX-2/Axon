@@ -3,24 +3,28 @@ import { Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { FolderInfo } from '../types/folder';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
-import { NameInputModal } from './NameInputModal';
 
 interface FolderContextMenuProps {
   folder: FolderInfo;
   onClose: () => void;
   position: { x: number; y: number };
   onRemove: (path: string) => void;
+  onRename?: (key: string) => void;
+  section?: string;
+  index?: number;
 }
 
-export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({ 
-  folder, 
-  onClose, 
-  position, 
-  onRemove
+export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
+  folder,
+  onClose,
+  position,
+  onRemove,
+  onRename,
+  section = 'folders',
+  index = 0
 }) => {
   const [showIconMenu, setShowIconMenu] = useState(false);
   const [showNameMenu, setShowNameMenu] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const updateFolderIcon = useUnifiedFolderStore(state => state.updateFolderIcon);
   const updateFolderName = useUnifiedFolderStore(state => state.updateFolderName);
@@ -62,9 +66,6 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
   }, [position]);
 
   useEffect(() => {
-    // Don't close the context menu if the name modal is open
-    if (showNameModal) return;
-
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
@@ -75,7 +76,7 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose, showNameModal]);
+  }, [onClose]);
 
   const handleRemoveIcon = async () => {
     try {
@@ -90,13 +91,11 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
   };
 
   const handleCustomName = () => {
-    setShowNameModal(true);
-  };
-
-  const handleNameSubmit = (name: string) => {
-    updateFolderName(folder.path, name);
-    setShowNameModal(false);
-    onClose();
+    if (onRename) {
+      const key = `${section}-${index}-${folder.path}`;
+      onRename(key);
+      onClose();
+    }
   };
 
   const handleResetName = () => {
@@ -230,13 +229,6 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
         <span>Remove Folder</span>
       </button>
 
-      <NameInputModal
-        isOpen={showNameModal}
-        onClose={() => setShowNameModal(false)}
-        onSubmit={handleNameSubmit}
-        currentName={folder.name}
-        title="Set Custom Name"
-      />
     </div>
   );
 };

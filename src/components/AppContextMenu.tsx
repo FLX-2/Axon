@@ -3,25 +3,29 @@ import { AppInfo } from '../types/app';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
-import { NameInputModal } from './NameInputModal';
 
 interface AppContextMenuProps {
   app: AppInfo;
   onClose: () => void;
   position: { x: number; y: number };
   onMove: (category: string) => void;
+  onRename?: (key: string) => void;
+  section?: string;
+  index?: number;
 }
 
-export const AppContextMenu: React.FC<AppContextMenuProps> = ({ 
-  app, 
-  onClose, 
-  position, 
-  onMove
+export const AppContextMenu: React.FC<AppContextMenuProps> = ({
+  app,
+  onClose,
+  position,
+  onMove,
+  onRename,
+  section = 'all',
+  index = 0
 }) => {
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showIconMenu, setShowIconMenu] = useState(false);
   const [showNameMenu, setShowNameMenu] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const categories = ['Games', 'Utilities', 'Media', 'Development', 'Other'];
   const updateAppIcon = useUnifiedAppStore(state => state.updateAppIcon);
@@ -64,9 +68,6 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
   }, [position]);
 
   useEffect(() => {
-    // Don't close the context menu if the name modal is open
-    if (showNameModal) return;
-
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
@@ -77,7 +78,7 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose, showNameModal]);
+  }, [onClose]);
 
   const handleRemoveIcon = async () => {
     try {
@@ -93,14 +94,13 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
   };
 
   const handleCustomName = () => {
-    setShowNameModal(true);
+    if (onRename) {
+      const key = `${section}-${index}-${app.path}`;
+      onRename(key);
+      onClose();
+    }
   };
 
-  const handleNameSubmit = (name: string) => {
-    updateAppName(app.path, name);
-    setShowNameModal(false);
-    onClose();
-  };
 
   const handleResetName = () => {
     updateAppName(app.path, null);
@@ -268,13 +268,6 @@ export const AppContextMenu: React.FC<AppContextMenuProps> = ({
         </div>
       </div>
 
-      <NameInputModal
-        isOpen={showNameModal}
-        onClose={() => setShowNameModal(false)}
-        onSubmit={handleNameSubmit}
-        currentName={app.name}
-        title="Set Custom Name"
-      />
     </>
   );
 };

@@ -4,6 +4,7 @@ import { AppInfo, AppCategory } from '../types/app';
 import { Play, Pin, ChevronDown, ChevronUp } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { AppContextMenu } from './AppContextMenu';
+import { InlineEditableText } from './InlineEditableText';
 import { useGridColumns } from '../hooks/useGridColumns';
 
 interface AppListProps {
@@ -16,7 +17,11 @@ const RecentAppsExpandable: React.FC<{
   onPin: (path: string) => void;
   onLaunch: (path: string) => void;
   onMove: (path: string, category: AppCategory) => void;
-}> = ({ apps, isGridView, onPin, onLaunch, onMove }) => {
+  onRename: (key: string) => void;
+  editingAppKey: string | null;
+  onSaveRename: (path: string, newName: string) => Promise<void>;
+  onCancelRename: () => void;
+}> = ({ apps, isGridView, onPin, onLaunch, onMove, onRename, editingAppKey, onSaveRename, onCancelRename }) => {
   const [contextMenu, setContextMenu] = useState<{
     app: AppInfo;
     position: { x: number; y: number };
@@ -63,8 +68,8 @@ const RecentAppsExpandable: React.FC<{
         className={`
           absolute top-2 right-2
           transition-opacity
-          ${app.isPinned 
-            ? 'opacity-100' 
+          ${app.isPinned
+            ? 'opacity-100'
             : 'opacity-0 group-hover:opacity-100'
           }
         `}
@@ -76,7 +81,7 @@ const RecentAppsExpandable: React.FC<{
       >
         <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconSecondary'}`} />
       </button>
-      
+
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         {app.icon && app.icon !== 'loading' ? (
           <img
@@ -89,9 +94,14 @@ const RecentAppsExpandable: React.FC<{
             <Play className="w-8 h-8 text-iconSecondary" />
           </div>
         )}
-        <span className="text-sm text-textPrimary text-center">
-          {app.name}
-        </span>
+        <InlineEditableText
+          value={app.name}
+          onSave={(newName) => onSaveRename(app.path, newName)}
+          onCancel={onCancelRename}
+          isEditing={editingAppKey === `recent-${apps.indexOf(app)}-${app.path}`}
+          className="text-sm text-textPrimary text-center w-full"
+          placeholder="Enter app name"
+        />
       </div>
     </div>
   );
@@ -105,6 +115,10 @@ const RecentAppsExpandable: React.FC<{
         onPin={onPin}
         onLaunch={onLaunch}
         onMove={onMove}
+        onRename={onRename}
+        editingAppKey={editingAppKey}
+        onSaveRename={onSaveRename}
+        onCancelRename={onCancelRename}
       />
     );
   }
@@ -164,6 +178,9 @@ const RecentAppsExpandable: React.FC<{
             onMove(contextMenu.app.path, category as AppCategory);
             setContextMenu(null);
           }}
+          onRename={onRename}
+          section="recent"
+          index={apps.indexOf(contextMenu.app)}
         />
       )}
     </>
@@ -176,7 +193,11 @@ const AppGrid: React.FC<{
   onPin: (path: string) => void;
   onLaunch: (path: string) => void;
   onMove: (path: string, category: AppCategory) => void;
-}> = ({ apps, isGridView, onPin, onLaunch, onMove }) => {
+  onRename: (key: string) => void;
+  editingAppKey: string | null;
+  onSaveRename: (path: string, newName: string) => Promise<void>;
+  onCancelRename: () => void;
+}> = ({ apps, isGridView, onPin, onLaunch, onMove, onRename, editingAppKey, onSaveRename, onCancelRename }) => {
   const [contextMenu, setContextMenu] = useState<{
     app: AppInfo;
     position: { x: number; y: number };
@@ -245,9 +266,14 @@ const AppGrid: React.FC<{
                       <Play className="w-8 h-8 text-iconSecondary" />
                     </div>
                   )}
-                  <span className="text-sm text-textPrimary">
-                    {app.name}
-                  </span>
+                  <InlineEditableText
+                    value={app.name}
+                    onSave={(newName) => onSaveRename(app.path, newName)}
+                    onCancel={onCancelRename}
+                    isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
+                    className="text-sm text-textPrimary"
+                    placeholder="Enter app name"
+                  />
                 </div>
               </>
             ) : (
@@ -264,9 +290,14 @@ const AppGrid: React.FC<{
                       <Play className="w-4 h-4 text-iconSecondary" />
                     </div>
                   )}
-                  <span className="text-sm text-textPrimary">
-                    {app.name}
-                  </span>
+                  <InlineEditableText
+                    value={app.name}
+                    onSave={(newName) => onSaveRename(app.path, newName)}
+                    onCancel={onCancelRename}
+                    isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
+                    className="text-sm text-textPrimary"
+                    placeholder="Enter app name"
+                  />
                 </div>
                 <button
                   className={`
@@ -299,6 +330,9 @@ const AppGrid: React.FC<{
             onMove(contextMenu.app.path, category as AppCategory);
             setContextMenu(null);
           }}
+          onRename={onRename}
+          section="all"
+          index={apps.indexOf(contextMenu.app)}
         />
       )}
     </>
@@ -312,9 +346,11 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     isGridView,
     togglePinned,
     updateLastAccessed,
-    updateCategory
+    updateCategory,
+    updateAppName
   } = useUnifiedAppStore();
   const columns = useGridColumns();
+  const [editingAppKey, setEditingAppKey] = useState<string | null>(null);
   
   const handleLaunch = async (path: string) => {
     try {
@@ -323,6 +359,23 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
     } catch (error) {
       console.error('Failed to launch app:', error);
     }
+  };
+
+  const startRename = (key: string) => {
+    setEditingAppKey(key);
+  };
+
+  const cancelRename = () => {
+    setEditingAppKey(null);
+  };
+
+  const saveRename = async (path: string, newName: string) => {
+    await updateAppName(path, newName);
+    setEditingAppKey(null);
+  };
+
+  const createAppKey = (section: string, index: number, appPath: string) => {
+    return `${section}-${index}-${appPath}`;
   };
 
   const filteredApps = apps.filter(app =>
@@ -354,6 +407,10 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
             onPin={togglePinned}
             onLaunch={handleLaunch}
             onMove={updateCategory}
+            onRename={startRename}
+            editingAppKey={editingAppKey}
+            onSaveRename={saveRename}
+            onCancelRename={cancelRename}
           />
         </div>
       )}
@@ -368,6 +425,10 @@ export const AppList: React.FC<AppListProps> = ({ selectedCategory }) => {
           onPin={togglePinned}
           onLaunch={handleLaunch}
           onMove={updateCategory}
+          onRename={startRename}
+          editingAppKey={editingAppKey}
+          onSaveRename={saveRename}
+          onCancelRename={cancelRename}
         />
       </div>
     </div>

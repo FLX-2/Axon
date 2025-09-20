@@ -4,16 +4,18 @@ import { dialog } from '@tauri-apps/api';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useUnifiedAppStore } from '../store/useUnifiedAppStore';
 import { FolderContextMenu } from './FolderContextMenu';
+import { InlineEditableText } from './InlineEditableText';
 import { useUnifiedFolderStore } from '../store/useUnifiedFolderStore';
 import { FolderInfo } from '../types/folder';
 
 export const Folders: React.FC = () => {
   const { isGridView } = useUnifiedAppStore();
-  const { folders, addFolder, removeFolder } = useUnifiedFolderStore();
+  const { folders, addFolder, removeFolder, updateFolderName } = useUnifiedFolderStore();
   const [contextMenu, setContextMenu] = useState<{
     folder: FolderInfo;
     position: { x: number; y: number };
   } | null>(null);
+  const [editingFolderKey, setEditingFolderKey] = useState<string | null>(null);
 
   const handleAddFolder = async () => {
     try {
@@ -37,6 +39,19 @@ export const Folders: React.FC = () => {
       folder,
       position: { x: e.clientX, y: e.clientY }
     });
+  };
+
+  const startFolderRename = (key: string) => {
+    setEditingFolderKey(key);
+  };
+
+  const cancelFolderRename = () => {
+    setEditingFolderKey(null);
+  };
+
+  const saveFolderRename = async (path: string, newName: string) => {
+    await updateFolderName(path, newName);
+    setEditingFolderKey(null);
   };
 
   return (
@@ -93,7 +108,14 @@ export const Folders: React.FC = () => {
                       <Folder className="w-8 h-8 text-iconSecondary" />
                     </div>
                   )}
-                  <span className="text-sm text-center text-textPrimary">{folder.name}</span>
+                  <InlineEditableText
+                    value={folder.name}
+                    onSave={(newName) => saveFolderRename(folder.path, newName)}
+                    onCancel={cancelFolderRename}
+                    isEditing={editingFolderKey === `folders-${folders.indexOf(folder)}-${folder.path}`}
+                    className="text-sm text-center text-textPrimary w-full"
+                    placeholder="Enter folder name"
+                  />
                 </>
               ) : (
                 <>
@@ -108,7 +130,14 @@ export const Folders: React.FC = () => {
                       <Folder className="w-5 h-5 text-iconSecondary" />
                     </div>
                   )}
-                  <span className="text-sm text-textPrimary">{folder.name}</span>
+                  <InlineEditableText
+                    value={folder.name}
+                    onSave={(newName) => saveFolderRename(folder.path, newName)}
+                    onCancel={cancelFolderRename}
+                    isEditing={editingFolderKey === `folders-${folders.indexOf(folder)}-${folder.path}`}
+                    className="text-sm text-textPrimary"
+                    placeholder="Enter folder name"
+                  />
                 </>
               )}
             </button>
@@ -128,6 +157,9 @@ export const Folders: React.FC = () => {
             position={contextMenu.position}
             onClose={() => setContextMenu(null)}
             onRemove={removeFolder}
+            onRename={startFolderRename}
+            section="folders"
+            index={folders.indexOf(contextMenu.folder)}
           />
         </>
       )}

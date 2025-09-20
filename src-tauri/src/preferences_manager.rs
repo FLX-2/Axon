@@ -290,6 +290,11 @@ impl PreferencesManager {
                     })
                     .collect();
             }
+            if let Some(removed) = apps.get("removed").and_then(|v| v.as_array()) {
+                prefs.apps.removed = removed.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+            }
 
         }
 

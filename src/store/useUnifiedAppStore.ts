@@ -550,9 +550,13 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
   restoreApp: async (path: string) => {
     const state = get();
+
+    // Find the app in the removed list to get its info
+    // Since we don't have the full app info stored, we'll need to reload the apps
+    // to get the restored app back into the main list
     const newRemovedApps = state.removedApps.filter(p => p !== path);
 
-    // Update UI state immediately
+    // Update UI state immediately - remove from removedApps
     set({
       removedApps: newRemovedApps
     });
@@ -566,6 +570,9 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
           }
         }
       });
+
+      // Reload apps to bring the restored app back into the main list
+      await get().loadApps();
     } catch (error) {
       console.error('Failed to save restored apps:', error);
       // Revert UI state on error

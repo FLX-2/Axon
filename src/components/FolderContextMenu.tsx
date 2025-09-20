@@ -217,9 +217,11 @@ export const FolderContextMenu: React.FC<FolderContextMenuProps> = ({
           </div>
         )}
       </div>
-      
+
+      {/* Folder Management */}
+      <div className="border-t border-border my-1"></div>
       <button
-        className="w-full text-left px-2 py-1 hover:bg-buttonHover text-sm flex items-center gap-2 text-red-500"
+        className="w-full text-left px-2 py-1 hover:bg-red-500/10 text-sm flex items-center gap-2 text-red-500"
         onClick={() => {
           onRemove(folder.path);
           onClose();

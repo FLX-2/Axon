@@ -130,19 +130,39 @@ fn create_app_info(path: &Path) -> Option<AppInfo> {
     let name_lower = name.to_lowercase();
     let path_lower = path_str.to_lowercase();
 
-    // Improved category detection
-    let category = if path_lower.contains("games") || path_lower.contains("gaming") || name_lower.contains("game") {
+    // Keyword lists by category
+    let games_keywords = [
+        "game", "games", "gaming", "minecraft", "roblox", 
+        "steam", "origin", "uplay", "epic", "gog"
+    ];
+    let media_keywords = [
+        "media", "video", "movie", "movies", "audio", "music",
+        "vlc", "spotify", "itunes", "audacity", "premiere",
+        "after effects", "davinci", "player"
+    ];
+    let utilities_keywords = [
+        "utilities", "utility", "tools", "accessories", "system tools",
+        "7-zip", "hwmonitor", "discord", "amd", "nvidia", "control panel"
+    ];
+    let dev_keywords = [
+        "development", "developer", "programming", "ide", "studio",
+        "powershell", "git", "node", "obsidian", "visual studio", "vscode"
+    ];
+
+    // Helper closure
+    let matches_any = |s: &str, keywords: &[&str]| {
+        keywords.iter().any(|k| s.contains(k))
+    };
+
+    // Category detection with priority order
+    let category = if matches_any(&name_lower, &games_keywords) || matches_any(&path_lower, &games_keywords) {
         "Games"
-    } else if path_lower.contains("steam") || name_lower.contains("steam") || path_lower.contains("origin") || name_lower.contains("uplay") {
-        "Games" // Recognize Steam, Origin, Uplay games
-    } else if path_lower.contains("media") || path_lower.contains("video") || name_lower.contains("movie") {
+    } else if matches_any(&name_lower, &media_keywords) || matches_any(&path_lower, &media_keywords) {
         "Media"
-    } else if path_lower.contains("utilities") || path_lower.contains("accessories") || path_lower.contains("system tools") {
+    } else if matches_any(&name_lower, &utilities_keywords) || matches_any(&path_lower, &utilities_keywords) {
         "Utilities"
-    } else if path_lower.contains("development") || path_lower.contains("programming") || name_lower.contains("ide") || name_lower.contains("studio") {
+    } else if matches_any(&name_lower, &dev_keywords) || matches_any(&path_lower, &dev_keywords) {
         "Development"
-    } else if name_lower.contains("chrome") || name_lower.contains("edge") || name_lower.contains("firefox") {
-        "Utilities" // Browsers as utilities
     } else {
         "Other"
     }.to_string();

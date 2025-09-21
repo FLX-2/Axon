@@ -127,16 +127,22 @@ fn scan_directory(dir: &Path, apps: &mut Vec<AppInfo>) -> Result<(), String> {
 fn create_app_info(path: &Path) -> Option<AppInfo> {
     let name = path.file_stem()?.to_string_lossy().into_owned();
     let path_str = path.to_string_lossy().into_owned();
-    
-    // Basic category detection based on path
-    let category = if path_str.contains("Games") {
+    let name_lower = name.to_lowercase();
+    let path_lower = path_str.to_lowercase();
+
+    // Improved category detection
+    let category = if path_lower.contains("games") || path_lower.contains("gaming") || name_lower.contains("game") {
         "Games"
-    } else if path_str.contains("Accessories") || path_str.contains("System Tools") {
-        "Utilities"
-    } else if path_str.contains("Media") {
+    } else if path_lower.contains("steam") || name_lower.contains("steam") || path_lower.contains("origin") || name_lower.contains("uplay") {
+        "Games" // Recognize Steam, Origin, Uplay games
+    } else if path_lower.contains("media") || path_lower.contains("video") || name_lower.contains("movie") {
         "Media"
-    } else if path_str.contains("Development") || path_str.contains("Programming") {
+    } else if path_lower.contains("utilities") || path_lower.contains("accessories") || path_lower.contains("system tools") {
+        "Utilities"
+    } else if path_lower.contains("development") || path_lower.contains("programming") || name_lower.contains("ide") || name_lower.contains("studio") {
         "Development"
+    } else if name_lower.contains("chrome") || name_lower.contains("edge") || name_lower.contains("firefox") {
+        "Utilities" // Browsers as utilities
     } else {
         "Other"
     }.to_string();

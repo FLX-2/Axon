@@ -23,7 +23,7 @@ const HiddenAppsExpandable: React.FC<{
 
   return (
     <div>
-      <div className="flex items-start mb-6">
+      <div className="flex items-start mb-4">
         <div className={PATTERNS.labelWithDescription}>
           <span className={TYPOGRAPHY.label}>Hidden Applications</span>
           <span className={TYPOGRAPHY.description}>
@@ -315,7 +315,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className={PATTERNS.settingItem}>
               <div className={PATTERNS.labelWithDescription}>
-                <span className={TYPOGRAPHY.label}>Open Startup Folder</span>
+                <span className={TYPOGRAPHY.label}>Open Start Menu Folder</span>
                 <span className={TYPOGRAPHY.description}>
                   Open the folder where the application shortcuts are stored
                 </span>

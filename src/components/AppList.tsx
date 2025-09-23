@@ -271,7 +271,7 @@ const AppGrid: React.FC<{
                     onSave={(newName) => onSaveRename(app.path, newName)}
                     onCancel={onCancelRename}
                     isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
-                    className="text-sm text-textPrimary"
+                    className="text-sm text-textPrimary text-center w-full"
                     placeholder="Enter app name"
                   />
                 </div>

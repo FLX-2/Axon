@@ -84,8 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Sticky bottom section */}
-      <div className="sticky bottom-0 bg-surfaceSecondary w-full pt-4 mt-4 space-y-2 pb-4">
-        <div className="flex justify-center pb-2">
+      <div className="sticky bottom-0 bg-surfaceSecondary w-full pt-2 space-y-2 pb-4">
+        <div className="flex justify-center py-0">
           <div className={`h-px bg-border ${isExpanded ? 'w-20' : 'w-8'}`}></div>
         </div>
         {bottomCategories.map(({ id, name, icon: Icon }) => (

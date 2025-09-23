@@ -75,7 +75,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
           bg-inputBg border border-accent rounded px-2 py-1 text-sm
           text-textPrimary placeholder-textSecondary
           focus:outline-none focus:ring-1 focus:ring-accent
-          w-full text-center
+          w-full ${className.includes('text-center') ? 'text-center' : 'text-left'}
           ${className}
         `}
         onClick={(e) => e.stopPropagation()}

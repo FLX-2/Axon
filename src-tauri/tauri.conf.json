@@ -65,7 +65,7 @@
         "resizable": true,
         "title": "Axon",
         "decorations": false,
-        "transparent": true,
+        "transparent": false,
         "center": true,
         "visible": false,
         "label": "main",

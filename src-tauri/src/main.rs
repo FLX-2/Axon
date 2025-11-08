@@ -3,7 +3,6 @@
 
 use tauri::{Manager, PhysicalSize, Size, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
 use window_shadows::set_shadow;
-use window_vibrancy::apply_blur;
 use winreg::enums::*;
 use winreg::RegKey;
 use std::fs;
@@ -1104,18 +1103,16 @@ fn main() {
                 
                 let window = app.get_window("main").unwrap();
                 
-                #[cfg(target_os = "windows")]
-                if let Err(e) = apply_blur(&window, Some((18, 18, 18, 125))) {
-                    log_error(&format!("Failed to apply blur: {:?}", e));
-                }
-
-                if let Err(e) = set_shadow(&window, true) {
-                    log_error(&format!("Failed to apply shadow: {:?}", e));
-                }
-
+                // Set window properties first
                 window.set_decorations(false).unwrap();
                 window.set_always_on_top(false).unwrap();
                 window.set_skip_taskbar(false).unwrap();
+                
+                // Apply Windows 11 styling (rounded corners, shadow, border)
+                #[cfg(target_os = "windows")]
+                if let Err(e) = set_shadow(&window, true) {
+                    log_error(&format!("Failed to apply window styling: {:?}", e));
+                }
                 
                 // Perform startup maintenance to validate and fix any path issues
                 if let Err(e) = StartupManager::perform_startup_maintenance() {

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="Axon"
+    Language="1033"
+    Version="{{version}}"
+    Manufacturer="Axon"
+    UpgradeCode="{{upgrade_code}}">
+    
+    <Package
+      InstallerVersion="450"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="Axon Installer"
+      Comments="Axon Application Launcher" />
+
+    <MajorUpgrade
+      Schedule="afterInstallInitialize"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed. Setup will now exit." />
+
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="{{program_files_dir}}">
+        <Directory Id="APPLICATIONFOLDER" Name="Axon">
+          {{component_group_refs}}
+        </Directory>
+      </Directory>
+      
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Axon" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="*">
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Name="Axon"
+          Description="Modern App Launcher"
+          Target="[APPLICATIONFOLDER]Axon.exe"
+          WorkingDirectory="APPLICATIONFOLDER" />
+        <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\Axon"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainApplication" Title="Axon" Level="1">
+      {{component_refs}}
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="CleanupWebView2" />
+    </Feature>
+
+    <!-- Custom action to clean up only WebView2 runtime cache on uninstall -->
+    <!-- User data (custom icons, preferences) is preserved -->
+    <Component Id="CleanupWebView2" Directory="TARGETDIR" Guid="*">
+      <RegistryValue Root="HKCU" Key="Software\Axon" Name="Cleanup" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <CustomAction
+      Id="CleanupWebView2Cache"
+      Directory="TARGETDIR"
+      ExeCommand="cmd.exe /c &quot;rd /s /q &quot;%LOCALAPPDATA%\Axon\EBWebView&quot; 2&gt;nul&quot;"
+      Execute="deferred"
+      Impersonate="yes"
+      Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="CleanupWebView2Cache" Before="RemoveFiles">Installed AND NOT REINSTALL</Custom>
+    </InstallExecuteSequence>
+
+    <Icon Id="ProductIcon" SourceFile="icons\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/yourusername/axon" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[APPLICATIONFOLDER]" After="CostFinalize" />
+  </Product>
+</Wix>

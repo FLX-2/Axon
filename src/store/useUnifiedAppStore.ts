@@ -11,22 +11,29 @@ const requestIdleCallback =
 // Load icons progressively with priority for visible apps
 const loadIconsProgressively = (
   apps: AppInfo[],
-  updateCallback: (apps: AppInfo[]) => void
+  updateCallback: (apps: AppInfo[]) => void,
+  progressCallback: (progress: number) => void
 ) => {
   const appsToProcess = [...apps];
   const result = [...apps];
+  const totalApps = apps.length;
+  let processedCount = 0;
 
   // Process icons in small batches to avoid freezing the UI
   const processBatch = async () => {
-    if (appsToProcess.length === 0) return;
+    if (appsToProcess.length === 0) {
+      progressCallback(100);
+      return;
+    }
 
-    // Take first 3 apps from the queue
-    const batch = appsToProcess.splice(0, 3);
+    // Take first 5 apps from the queue (increased from 3 for faster loading)
+    const batch = appsToProcess.splice(0, 5);
 
     // Process this batch
     await Promise.all(batch.map(async (app) => {
       // Skip if we already have an icon (not 'loading')
       if (app.icon && app.icon !== 'loading') {
+        processedCount++;
         return;
       }
 
@@ -44,7 +51,12 @@ const loadIconsProgressively = (
           result[index] = { ...result[index], icon: null };
         }
       }
+      processedCount++;
     }));
+
+    // Update progress
+    const progress = Math.round((processedCount / totalApps) * 100);
+    progressCallback(progress);
 
     // Update UI with latest results
     updateCallback([...result]);
@@ -63,6 +75,7 @@ interface AppState {
   apps: AppInfo[];
   searchTerm: string;
   isLoading: boolean;
+  iconLoadingProgress: number; // 0-100, tracks icon loading progress
   isGridView: boolean;
   customIcons: Record<string, string>;
   customNames: Record<string, string>;
@@ -91,6 +104,7 @@ const initialState = {
   apps: [],
   searchTerm: '',
   isLoading: true,
+  iconLoadingProgress: 0,
   isGridView: true,
   customIcons: {},
   customNames: {},
@@ -284,7 +298,7 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
   },
 
   loadApps: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, iconLoadingProgress: 0 });
     try {
       // First load preferences from backend
       await get().initializeApps();
@@ -319,18 +333,24 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
       // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(visibleApps, (updatedAppsWithIcons) => {
-          set({ apps: updatedAppsWithIcons });
-        });
+        loadIconsProgressively(
+          visibleApps,
+          (updatedAppsWithIcons) => {
+            set({ apps: updatedAppsWithIcons });
+          },
+          (progress) => {
+            set({ iconLoadingProgress: progress });
+          }
+        );
       });
     } catch (error) {
       console.error('Failed to load apps:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, iconLoadingProgress: 0 });
     }
   },
 
   refreshApps: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, iconLoadingProgress: 0 });
     try {
       const apps = await refreshStartMenuApps() as AppInfo[];
       const state = get();
@@ -361,13 +381,19 @@ export const useUnifiedAppStore = create<AppState>((set, get) => ({
 
       // Load icons in background with priority for visible apps
       requestIdleCallback(() => {
-        loadIconsProgressively(visibleApps, (updatedAppsWithIcons) => {
-          set({ apps: updatedAppsWithIcons });
-        });
+        loadIconsProgressively(
+          visibleApps,
+          (updatedAppsWithIcons) => {
+            set({ apps: updatedAppsWithIcons });
+          },
+          (progress) => {
+            set({ iconLoadingProgress: progress });
+          }
+        );
       });
     } catch (error) {
       console.error('Failed to refresh apps:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, iconLoadingProgress: 0 });
     }
   },
 

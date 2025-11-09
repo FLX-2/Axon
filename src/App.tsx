@@ -14,12 +14,12 @@ import { useDelayedLoading } from './hooks/useDelayedLoading';
 
 function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const { loadApps, isLoading } = useUnifiedAppStore();
+  const { loadApps, isLoading, iconLoadingProgress } = useUnifiedAppStore();
   const { initializeSettings } = useUnifiedSettingsStore();
   const { initializeFolders } = useUnifiedFolderStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // Show loading screen for at least 1.2 seconds for better UX
-  const showLoading = useDelayedLoading(isLoading, 1200);
+  // Show loading screen until icons are mostly loaded (at least 80%)
+  const showLoading = useDelayedLoading(isLoading || iconLoadingProgress < 80, 1200);
 
   useEffect(() => {
     if (scrollContainerRef.current) {

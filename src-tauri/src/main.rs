@@ -10,16 +10,17 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use windows::Win32::UI::Shell::{
-    SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGetFileInfoW,
-    ShellLink, IShellLinkW
+    SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_SYSICONINDEX, SHGetFileInfoW,
+    ShellLink, IShellLinkW, SHGetImageList, SHIL_JUMBO
 };
 use windows::Win32::System::Com::{
     CoCreateInstance, CLSCTX_INPROC_SERVER, STGM_READ,
     IPersistFile
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyIcon, DrawIconEx, HICON, DI_NORMAL
+    DestroyIcon, DrawIconEx, HICON, DI_NORMAL, GetIconInfo, ICONINFO
 };
+use windows::Win32::UI::Controls::IImageList;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
     GetDC, ReleaseDC, SelectObject, GetBitmapBits, FillRect, GetStockObject,
@@ -185,8 +186,8 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
         let path_wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let mut file_info: SHFILEINFOW = std::mem::zeroed();
         
-        // Try with different flag combinations
-        let flags = SHGFI_ICON | SHGFI_LARGEICON;
+        // First, get the icon index using SHGFI_SYSICONINDEX
+        let flags = SHGFI_SYSICONINDEX;
         
         let result = SHGetFileInfoW(
             PCWSTR(path_wide.as_ptr()),
@@ -196,7 +197,7 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
             flags
         );
 
-        if result == 0 || file_info.hIcon.is_invalid() {
+        if result == 0 {
             // If first attempt fails, handle different file types
             let path_lower = path.to_lowercase();
             
@@ -247,13 +248,46 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
             return Err("Failed to get icon".into());
         }
 
-        // Brief delay to ensure icon is fully loaded (optimized for performance)
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Get the jumbo image list (256x256 icons)
+        let image_list: IImageList = match SHGetImageList(SHIL_JUMBO as i32) {
+            Ok(list) => list,
+            Err(_) => {
+                // Fallback to large icon if jumbo not available
+                log_error("Failed to get jumbo icon list, trying large icons");
+                let flags = SHGFI_ICON | SHGFI_LARGEICON;
+                let result = SHGetFileInfoW(
+                    PCWSTR(path_wide.as_ptr()),
+                    FILE_FLAGS_AND_ATTRIBUTES(0),
+                    Some(&mut file_info),
+                    std::mem::size_of::<SHFILEINFOW>() as u32,
+                    flags
+                );
+                
+                if result == 0 || file_info.hIcon.is_invalid() {
+                    return Err("Failed to get icon".into());
+                }
+                
+                let bitmap = icon_to_bitmap(file_info.hIcon)?;
+                let base64 = STANDARD.encode(&bitmap);
+                
+                if let Err(e) = DestroyIcon(file_info.hIcon) {
+                    log_error(&format!("Failed to destroy icon: {:?}", e));
+                }
+                
+                return Ok(format!("data:image/png;base64,{}", base64));
+            }
+        };
 
-        let bitmap = icon_to_bitmap(file_info.hIcon)?;
+        // Extract the icon from the image list
+        let hicon = match image_list.GetIcon(file_info.iIcon, 0) {
+            Ok(icon) => icon,
+            Err(_) => return Err("Failed to extract icon from image list".into()),
+        };
+
+        let bitmap = icon_to_bitmap(hicon)?;
         let base64 = STANDARD.encode(&bitmap);
         
-        if let Err(e) = DestroyIcon(file_info.hIcon) {
+        if let Err(e) = DestroyIcon(hicon) {
             log_error(&format!("Failed to destroy icon: {:?}", e));
         }
         
@@ -263,11 +297,17 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
 
 fn icon_to_bitmap(hicon: HICON) -> Result<Vec<u8>, String> {
     unsafe {
+        // Get icon info to determine actual size
+        let mut icon_info: ICONINFO = std::mem::zeroed();
+        if GetIconInfo(hicon, &mut icon_info).is_err() {
+            log_error("Failed to get icon info, using default size");
+        }
+        
         let hdc = GetDC(None);
         let hdcmem = CreateCompatibleDC(hdc);
         
-        // Optimized size for performance vs quality balance
-        let size: u32 = 96;  // Reduced for better performance
+        // Balanced icon size for quality and performance
+        let size: u32 = 128;  // Sweet spot for crisp icons with fast loading
         let hbitmap = CreateCompatibleBitmap(hdc, size as i32, size as i32);
         let holdbitmap = SelectObject(hdcmem, hbitmap);
         
@@ -285,7 +325,8 @@ fn icon_to_bitmap(hicon: HICON) -> Result<Vec<u8>, String> {
             HBRUSH(brush.0)
         );
         
-        // Draw the icon with better quality
+        // Always draw icon stretched to full size to avoid small icons in corner
+        // The DI_NORMAL flag with explicit dimensions should stretch the icon
         if let Err(e) = DrawIconEx(
             hdcmem,
             0,
@@ -299,6 +340,14 @@ fn icon_to_bitmap(hicon: HICON) -> Result<Vec<u8>, String> {
         ) {
             log_error(&format!("Failed to draw icon: {:?}", e));
             return Err("Failed to draw icon".into());
+        }
+        
+        // Clean up icon info bitmaps
+        if !icon_info.hbmColor.is_invalid() {
+            DeleteObject(icon_info.hbmColor);
+        }
+        if !icon_info.hbmMask.is_invalid() {
+            DeleteObject(icon_info.hbmMask);
         }
         
         let mut bits = vec![0u8; (size * size * 4) as usize];
@@ -316,9 +365,65 @@ fn icon_to_bitmap(hicon: HICON) -> Result<Vec<u8>, String> {
             }
         }
         
-        // Create high-quality PNG
-        let img = image::RgbaImage::from_raw(size, size, bits)
+        // Create image from raw bits
+        let mut img = image::RgbaImage::from_raw(size, size, bits)
             .ok_or_else(|| "Failed to create image".to_string())?;
+        
+        // Detect if icon is small (drawn in corner) by checking if most of the image is transparent
+        let non_transparent_pixels: usize = img.pixels()
+            .filter(|p| p[3] > 0)
+            .count();
+        let total_pixels = (size * size) as usize;
+        let coverage = non_transparent_pixels as f32 / total_pixels as f32;
+        
+        // If less than 25% of pixels are used, the icon is probably small and needs scaling
+        if coverage < 0.25 && non_transparent_pixels > 0 {
+            log_error(&format!("Small icon detected ({}% coverage), scaling up", (coverage * 100.0) as u32));
+            
+            // Find the bounding box of non-transparent pixels
+            let mut min_x = size;
+            let mut min_y = size;
+            let mut max_x = 0;
+            let mut max_y = 0;
+            
+            for (x, y, pixel) in img.enumerate_pixels() {
+                if pixel[3] > 0 {
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
+                }
+            }
+            
+            // Crop to the actual icon content
+            let icon_width = max_x - min_x + 1;
+            let icon_height = max_y - min_y + 1;
+            
+            if icon_width > 0 && icon_height > 0 {
+                let cropped = image::imageops::crop(&mut img, min_x, min_y, icon_width, icon_height).to_image();
+                
+                // Scale up to fill most of the canvas (90%) while maintaining aspect ratio
+                let target_size = (size as f32 * 0.9) as u32;
+                let scale = target_size as f32 / icon_width.max(icon_height) as f32;
+                let new_width = (icon_width as f32 * scale) as u32;
+                let new_height = (icon_height as f32 * scale) as u32;
+                
+                let scaled = image::imageops::resize(
+                    &cropped,
+                    new_width,
+                    new_height,
+                    image::imageops::FilterType::Lanczos3
+                );
+                
+                // Center the scaled icon on a transparent canvas
+                let mut centered = image::RgbaImage::from_pixel(size, size, image::Rgba([0, 0, 0, 0]));
+                let offset_x = (size - new_width) / 2;
+                let offset_y = (size - new_height) / 2;
+                image::imageops::overlay(&mut centered, &scaled, offset_x as i64, offset_y as i64);
+                
+                img = centered;
+            }
+        }
         
         let mut png_data = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut png_data);

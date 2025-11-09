@@ -13,40 +13,13 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
   const activeColors = themeMode === 'dark' || themeMode === 'black' ? colors.dark : colors.light;
   const accentColor = activeColors.accent;
 
-  // Get the actual loading state
-  const { isLoading } = useUnifiedAppStore();
+  // Get the actual loading state and icon progress
+  const { isLoading, iconLoadingProgress } = useUnifiedAppStore();
   
-  // Simulate progress with acceleration when actual loading completes
+  // Use real icon loading progress (no animation, instant update)
   useEffect(() => {
-    // Clear any existing interval
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-    
-    // Set up the progress simulation
-    progressIntervalRef.current = setInterval(() => {
-      setProgress(prev => {
-        // If actual loading is complete, accelerate progress
-        if (!isLoading) {
-          // Accelerate based on how far we are from 100%
-          const remainingProgress = 100 - prev;
-          const increment = Math.max(remainingProgress * 0.2, 5); // At least 5% or 20% of remaining
-          const newProgress = prev + increment;
-          return newProgress > 100 ? 100 : newProgress;
-        } else {
-          // Normal progress during loading
-          const newProgress = prev + (Math.random() * 3);
-          return newProgress > 95 ? 95 : newProgress; // Cap at 95% during actual loading
-        }
-      });
-    }, isLoading ? 150 : 50); // Faster updates when loading is complete
-    
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, [isLoading]);
+    setProgress(iconLoadingProgress);
+  }, [iconLoadingProgress]);
 
   return (
     <div className="fixed inset-0 bg-surfacePrimary flex items-center justify-center z-[9999]">

@@ -14,9 +14,17 @@ const loadIconsProgressively = (
   updateCallback: (apps: AppInfo[]) => void,
   progressCallback: (progress: number) => void
 ) => {
-  const appsToProcess = [...apps];
+  // Separate Steam games from regular apps for prioritized loading
+  const isSteamGame = (app: AppInfo) => 
+    app.path.toLowerCase().includes('\\steam\\') && app.path.toLowerCase().endsWith('.url');
+  
+  const regularApps = apps.filter(app => !isSteamGame(app));
+  const steamApps = apps.filter(app => isSteamGame(app));
+  
+  // Process regular apps first, then Steam games
+  const appsToProcess = [...regularApps, ...steamApps];
   const result = [...apps];
-  const totalApps = apps.length;
+  const regularAppsCount = regularApps.length;
   let processedCount = 0;
 
   // Process icons in small batches to avoid freezing the UI
@@ -54,8 +62,11 @@ const loadIconsProgressively = (
       processedCount++;
     }));
 
-    // Update progress
-    const progress = Math.round((processedCount / totalApps) * 100);
+    // Update progress - reach 100% after regular apps (before Steam games)
+    // This allows the loading screen to disappear while Steam icons load in background
+    const progress = processedCount <= regularAppsCount 
+      ? Math.round((processedCount / regularAppsCount) * 100)
+      : 100;
     progressCallback(progress);
 
     // Update UI with latest results

@@ -30,25 +30,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div
       className={`${
         isExpanded ? 'w-48' : 'w-16'
-      } bg-surfaceSecondary border-r border-border flex flex-col transition-all duration-200`}
+      } bg-surfaceSecondary border-r border-border flex flex-col transition-all duration-200 relative z-10`}
     >
       {/* Header with toggle button */}
       <div className={`w-full flex py-3 ${isExpanded ? 'justify-end pr-3' : 'justify-center'}`}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`
-            w-10 h-10
-            flex items-center justify-center
-            hover:bg-surfaceHover
-            transition-all duration-200
-            rounded-lg
-          `}
+          className="w-10 h-10 flex items-center justify-center hover:bg-buttonHover transition-colors rounded-lg group"
           title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {isExpanded ? (
-            <PanelLeft className="w-5 h-5 text-iconPrimary" />
+            <PanelLeft className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           ) : (
-            <PanelLeftOpen className="w-5 h-5 text-iconPrimary" />
+            <PanelLeftOpen className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           )}
         </button>
       </div>
@@ -63,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={name}
               onClick={() => onSelectCategory(id)}
-              className={`w-[calc(100%-8px)] mx-1 flex items-center px-2 py-2 transition-colors rounded-lg ${
+              className={`w-[calc(100%-8px)] mx-1 flex items-center px-2 py-2 transition-colors rounded-lg group ${
                 isExpanded ? 'justify-start space-x-3' : 'justify-center'
               } ${
                 selectedCategory === id
@@ -72,10 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
               title={isExpanded ? undefined : name}
             >
-              <Icon className={`w-6 h-9 flex-shrink-0 ${
+              <Icon className={`w-6 h-9 flex-shrink-0 transition-colors ${
                 selectedCategory === id
                   ? 'text-accent'
-                  : 'text-sidebarIcon hover:text-sidebarIconHover'
+                  : 'text-sidebarIcon group-hover:text-sidebarIconHover'
               }`} />
               {isExpanded && <span className="text-sm text-sidebarText">{name}</span>}
             </button>
@@ -92,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             key={name}
             onClick={() => onSelectCategory(id)}
-            className={`w-[calc(100%-8px)] mx-1 flex items-center px-2 py-2 transition-colors rounded-lg ${
+            className={`w-[calc(100%-8px)] mx-1 flex items-center px-2 py-2 transition-colors rounded-lg group ${
               isExpanded ? 'justify-start space-x-3' : 'justify-center'
             } ${
               selectedCategory === id
@@ -101,10 +95,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
             title={isExpanded ? undefined : name}
           >
-            <Icon className={`w-6 h-9 flex-shrink-0 ${
+            <Icon className={`w-6 h-9 flex-shrink-0 transition-colors ${
               selectedCategory === id
                 ? 'text-accent'
-                : 'text-sidebarIcon hover:text-sidebarIconHover'
+                : 'text-sidebarIcon group-hover:text-sidebarIconHover'
             }`} />
             {isExpanded && <span className="text-sm text-sidebarText">{name}</span>}
           </button>

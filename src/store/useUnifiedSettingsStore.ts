@@ -60,10 +60,10 @@ interface SettingsState {
 
 const defaultColors = {
   light: {
-    // Backgrounds
+    // Backgrounds - Keep your original colors
     surfacePrimary: '#fcfafd',
     surfaceSecondary: '#f3f2f2',
-    surfaceHover: '#f7f6f6',
+    surfaceHover: '#eeeeee',        // Darker hover (you liked this)
 
     // Text & Icons - Sidebar
     sidebarText: '#111827',
@@ -78,7 +78,7 @@ const defaultColors = {
     iconSecondary: '#737272',
 
     // UI Elements
-    accent: '#007acc', // Windows blue as fallback
+    accent: '#007acc',
     scrollbar: '#e5e7eb',
     scrollbarHover: '#d1d5db',
     buttonSelected: '#d4d2d2',

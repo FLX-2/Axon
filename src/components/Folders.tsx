@@ -74,7 +74,7 @@ export const Folders: React.FC = () => {
         <div className={`
           ${isGridView
             ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'
-            : 'space-y-2'
+            : 'space-y-1'
           }
         `}>
           {folders.map((folder) => (
@@ -83,12 +83,14 @@ export const Folders: React.FC = () => {
             onContextMenu={(e) => handleContextMenu(e, folder)}
             className={`
               ${isGridView
-                ? 'flex flex-col items-center p-4 aspect-[3/4] bg-surfaceSecondary hover:bg-surfaceHover'
-                : 'flex items-center w-full px-4 py-2 hover:bg-surfaceHover'
+                ? 'flex flex-col items-center p-4 aspect-[3/4]'
+                : 'flex items-center w-full px-4 py-4'
               }
+              bg-surfaceSecondary hover:bg-surfaceHover
               group
               transition-colors rounded-lg
               relative
+              border border-border dark:border-transparent
             `}
           >
             <button

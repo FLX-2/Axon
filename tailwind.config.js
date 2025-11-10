@@ -7,6 +7,10 @@ export default {
       animation: {
         'spin-slow': 'spin 3s linear infinite',
       },
+      boxShadow: {
+        'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
+      },
       colors: {
         // Backgrounds
         surfacePrimary: 'var(--color-surfacePrimary)',

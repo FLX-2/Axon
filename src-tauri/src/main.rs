@@ -176,12 +176,174 @@ fn create_app_info(path: &Path) -> Option<AppInfo> {
     })
 }
 
+// Helper function to find Steam installation path
+fn find_steam_executable() -> Result<String, String> {
+    // Common Steam installation paths
+    let steam_paths = [
+        "C:\\Program Files (x86)\\Steam\\steam.exe",
+        "C:\\Program Files\\Steam\\steam.exe",
+    ];
+    
+    for path in &steam_paths {
+        if std::path::Path::new(path).exists() {
+            return Ok(path.to_string());
+        }
+    }
+    
+    // Try to find Steam from registry
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(steam_key) = hkcu.open_subkey("Software\\Valve\\Steam") {
+        if let Ok(steam_path) = steam_key.get_value::<String, _>("SteamExe") {
+            if std::path::Path::new(&steam_path).exists() {
+                return Ok(steam_path);
+            }
+        }
+    }
+    
+    Err("Steam installation not found".to_string())
+}
+
+// Helper function to get Steam game icon from local cache
+fn get_steam_game_icon(url: &str) -> Result<String, String> {
+    // Extract app ID from steam://rungameid/12345
+    let app_id = url
+        .trim_start_matches("steam://rungameid/")
+        .split('/')
+        .next()
+        .ok_or("Failed to parse Steam app ID")?;
+    
+    log_error(&format!("Extracted Steam app ID: {}", app_id));
+    
+    // Find Steam installation
+    let steam_exe = find_steam_executable()?;
+    let steam_dir = std::path::Path::new(&steam_exe)
+        .parent()
+        .ok_or("Failed to get Steam directory")?;
+    
+    // Look for game icon in Steam's library cache
+    // Steam stores icons as: Steam/appcache/librarycache/[appid]_icon.jpg
+    // Also try logo version: [appid]_logo.png
+    let library_cache = steam_dir.join("appcache").join("librarycache");
+    
+    let icon_paths = [
+        library_cache.join(format!("{}_icon.jpg", app_id)),
+        library_cache.join(format!("{}_logo.png", app_id)),
+    ];
+    
+    for icon_path in &icon_paths {
+        log_error(&format!("Looking for Steam icon at: {}", icon_path.display()));
+        
+        if !icon_path.exists() {
+            continue;
+        }
+        
+        log_error(&format!("Found Steam icon: {}", icon_path.display()));
+        // Read the JPG file and convert to base64
+        match std::fs::read(&icon_path) {
+            Ok(icon_data) => {
+                // Convert JPG to PNG for consistency
+                match image::load_from_memory(&icon_data) {
+                    Ok(img) => {
+                        // Resize to 128x128 to match other icons
+                        let resized = image::imageops::resize(
+                            &img,
+                            128,
+                            128,
+                            image::imageops::FilterType::Lanczos3
+                        );
+                        
+                        let mut png_data = Vec::new();
+                        let mut cursor = std::io::Cursor::new(&mut png_data);
+                        
+                        let encoder = image::codecs::png::PngEncoder::new_with_quality(
+                            &mut cursor,
+                            image::codecs::png::CompressionType::Best,
+                            image::codecs::png::FilterType::Adaptive
+                        );
+                        
+                        if let Err(e) = encoder.write_image(
+                            resized.as_raw(),
+                            128,
+                            128,
+                            image::ColorType::Rgba8
+                        ) {
+                            log_error(&format!("Failed to encode Steam icon: {}", e));
+                            return Err("Failed to encode Steam icon".to_string());
+                        }
+                        
+                        let base64 = STANDARD.encode(&png_data);
+                        log_error("Successfully loaded Steam game icon");
+                        return Ok(format!("data:image/png;base64,{}", base64));
+                    }
+                    Err(e) => {
+                        log_error(&format!("Failed to load Steam icon image: {}", e));
+                        // Continue to try next icon path
+                    }
+                }
+            }
+            Err(e) => {
+                log_error(&format!("Failed to read Steam icon file: {}", e));
+                // Continue to try next icon path
+            }
+        }
+    }
+    
+    log_error("Steam icon file not found in cache");
+    Err("Steam icon not found in cache".to_string())
+}
+
 #[tauri::command]
 async fn get_app_icon(path: String) -> Result<String, String> {
     get_app_icon_internal(&path)
 }
 
 fn get_app_icon_internal(path: &str) -> Result<String, String> {
+    // Check for special file types BEFORE trying Windows API
+    let path_lower = path.to_lowercase();
+    
+    // Handle Steam .url files specially
+    if path_lower.ends_with(".url") {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            // Check if it's a Steam game URL
+            let is_steam = content.lines()
+                .find(|line| line.starts_with("URL="))
+                .map(|line| line.contains("steam://rungameid/"))
+                .unwrap_or(false);
+            
+            if is_steam {
+                log_error(&format!("Detected Steam game shortcut: {}", path));
+                
+                // First, try to use the IconFile path specified in the .url file
+                if let Some(icon_line) = content.lines().find(|line| line.starts_with("IconFile=")) {
+                    let icon_path = icon_line.trim_start_matches("IconFile=").trim();
+                    log_error(&format!("Found IconFile path: {}", icon_path));
+                    
+                    if std::path::Path::new(icon_path).exists() {
+                        log_error("IconFile exists, extracting icon from .ico file");
+                        // The .ico file exists, extract icon from it
+                        return get_app_icon_internal(icon_path);
+                    } else {
+                        log_error("IconFile does not exist");
+                    }
+                }
+                
+                // Fallback: Try to get from Steam library cache
+                if let Some(url_line) = content.lines().find(|line| line.starts_with("URL=")) {
+                    let url = url_line.trim_start_matches("URL=").trim();
+                    if let Ok(steam_icon) = get_steam_game_icon(url) {
+                        return Ok(steam_icon);
+                    }
+                }
+                
+                // Final fallback: Use Steam.exe icon
+                log_error("Failed to get Steam game icon, using Steam.exe icon");
+                if let Ok(steam_exe) = find_steam_executable() {
+                    return get_app_icon_internal(&steam_exe);
+                }
+            }
+        }
+    }
+    
     unsafe {
         let path_wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let mut file_info: SHFILEINFOW = std::mem::zeroed();
@@ -199,7 +361,6 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
 
         if result == 0 {
             // If first attempt fails, handle different file types
-            let path_lower = path.to_lowercase();
             
             if path_lower.ends_with(".lnk") {
                 // For .lnk files, get icon from target
@@ -207,7 +368,7 @@ fn get_app_icon_internal(path: &str) -> Result<String, String> {
                     return get_app_icon_internal(&target_path);
                 }
             } else if path_lower.ends_with(".url") {
-                // For .url files, use default browser icon or parse the URL file
+                // For non-Steam .url files
                 log_error(&format!("Getting icon for URL file: {}", path));
                 
                 // Try to read the URL file to extract the URL

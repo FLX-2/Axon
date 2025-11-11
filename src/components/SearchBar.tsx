@@ -66,9 +66,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
           title={isGridView ? "Switch to list view" : "Switch to grid view"}
         >
           {isGridView ? (
-            <List className="w-5 h-5 text-iconPrimary group-hover:text-iconSecondary transition-colors" />
+            <List className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           ) : (
-            <LayoutGrid className="w-5 h-5 text-iconPrimary group-hover:text-iconSecondary transition-colors" />
+            <LayoutGrid className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           )}
         </button>
         <div className="w-px h-5 bg-border mx-1"></div>
@@ -78,9 +78,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
           title={selectedCategory === 'Folders' ? "Add folder" : "Add custom app"}
         >
           {selectedCategory === 'Folders' ? (
-            <FolderPlus className="w-5 h-5 text-iconPrimary group-hover:text-iconSecondary transition-colors" />
+            <FolderPlus className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           ) : (
-            <Plus className="w-5 h-5 text-iconPrimary group-hover:text-iconSecondary transition-colors" />
+            <Plus className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
           )}
         </button>
       </div>

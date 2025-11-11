@@ -83,66 +83,99 @@ export const Folders: React.FC = () => {
             onContextMenu={(e) => handleContextMenu(e, folder)}
             className={`
               ${isGridView
-                ? 'flex flex-col items-center p-4 aspect-[3/4]'
+                ? 'flex flex-col items-center p-4 aspect-[3/4] overflow-hidden'
                 : 'flex items-center w-full px-4 py-4'
               }
-              bg-surfaceSecondary hover:bg-surfaceHover
+              bg-surfaceSecondary
+              ${!isGridView ? 'hover:bg-surfaceHover' : ''}
               group
               transition-colors rounded-lg
               relative
               border border-border dark:border-transparent
             `}
           >
-            <button
-              onClick={() => handleOpenFolder(folder.path)}
-              className={isGridView ? "flex-1 flex flex-col items-center justify-center w-full" : "flex items-center space-x-3 flex-grow"}
-            >
-              {isGridView ? (
-                <>
-                  {folder.icon ? (
-                    <img 
-                      src={folder.icon} 
-                      alt={folder.name}
-                      className="w-20 h-20 mb-4 app-icon"
+            {isGridView ? (
+              <>
+                {/* Top half background - darker in light mode, lighter in dark mode */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-black/[0.02] dark:bg-white/[0.02]" style={{ zIndex: 0 }} />
+
+                {/* Hover overlay that covers entire card */}
+                <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
+
+                {/* Blurred background layer */}
+                {folder.icon && (
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1/2 overflow-hidden rounded-t-lg"
+                    style={{ zIndex: 2 }}
+                  >
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        backgroundImage: `url(${folder.icon})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: 'blur(40px)',
+                        opacity: 0.05,
+                        transform: 'scale(1.2)',
+                      }}
                     />
-                  ) : (
-                    <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Folder className="w-8 h-8 text-iconDefault" />
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                {/* Icon and text grouped and centered on dividing line */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
+                  <button
+                    onClick={() => handleOpenFolder(folder.path)}
+                    className="flex flex-col items-center"
+                  >
+                    {folder.icon ? (
+                      <img 
+                        src={folder.icon} 
+                        alt={folder.name}
+                        className="w-[88px] h-[88px] app-icon"
+                      />
+                    ) : (
+                      <div className="w-[88px] h-[88px] bg-surfaceHover rounded-lg flex items-center justify-center">
+                        <Folder className="w-9 h-9 text-iconDefault" />
+                      </div>
+                    )}
+                  </button>
                   <InlineEditableText
                     value={folder.name}
                     onSave={(newName) => saveFolderRename(folder.path, newName)}
                     onCancel={cancelFolderRename}
                     isEditing={editingFolderKey === `folders-${folders.indexOf(folder)}-${folder.path}`}
-                    className="text-sm text-center text-textPrimary w-full"
+                    className="text-sm text-center text-textPrimary w-full font-medium px-3"
                     placeholder="Enter folder name"
                   />
-                </>
-              ) : (
-                <>
-                  {folder.icon ? (
-                    <img 
-                      src={folder.icon} 
-                      alt={folder.name}
-                      className="w-8 h-8 app-icon"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Folder className="w-5 h-5 text-iconDefault" />
-                    </div>
-                  )}
-                  <InlineEditableText
-                    value={folder.name}
-                    onSave={(newName) => saveFolderRename(folder.path, newName)}
-                    onCancel={cancelFolderRename}
-                    isEditing={editingFolderKey === `folders-${folders.indexOf(folder)}-${folder.path}`}
-                    className="text-sm text-textPrimary"
-                    placeholder="Enter folder name"
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => handleOpenFolder(folder.path)}
+                className="flex items-center space-x-3 flex-grow"
+              >
+                {folder.icon ? (
+                  <img 
+                    src={folder.icon} 
+                    alt={folder.name}
+                    className="w-8 h-8 app-icon"
                   />
-                </>
-              )}
-            </button>
+                ) : (
+                  <div className="w-8 h-8 bg-surfaceHover rounded-lg flex items-center justify-center">
+                    <Folder className="w-5 h-5 text-iconDefault" />
+                  </div>
+                )}
+                <InlineEditableText
+                  value={folder.name}
+                  onSave={(newName) => saveFolderRename(folder.path, newName)}
+                  onCancel={cancelFolderRename}
+                  isEditing={editingFolderKey === `folders-${folders.indexOf(folder)}-${folder.path}`}
+                  className="text-sm text-textPrimary font-medium"
+                  placeholder="Enter folder name"
+                />
+              </button>
+            )}
           </div>
         ))}
         </div>

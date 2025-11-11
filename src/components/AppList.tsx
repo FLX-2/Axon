@@ -66,8 +66,8 @@ const RecentAppsExpandable: React.FC<{
     >
 
 
-      {/* Top half background - slightly lighter */}
-      <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg" style={{ zIndex: 0, backgroundColor: 'rgba(255, 255, 255, 0.02)' }} />
+      {/* Top half background - darker in light mode, lighter in dark mode */}
+      <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-black/[0.02] dark:bg-white/[0.02]" style={{ zIndex: 0 }} />
 
       {/* Hover overlay that covers entire card */}
       <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
@@ -112,16 +112,16 @@ const RecentAppsExpandable: React.FC<{
       </button>
 
       {/* Icon and text grouped and centered on dividing line */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3" style={{ zIndex: 2 }}>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
         {app.icon && app.icon !== 'loading' ? (
           <img
             src={app.icon}
             alt={app.name}
-            className="app-icon w-24 h-24"
+            className="app-icon w-[88px] h-[88px]"
           />
         ) : (
-          <div className="w-24 h-24 bg-surfaceHover rounded-lg flex items-center justify-center">
-            <Play className="w-10 h-10 text-iconDefault" />
+          <div className="w-[88px] h-[88px] bg-surfaceHover rounded-lg flex items-center justify-center">
+            <Play className="w-9 h-9 text-iconDefault" />
           </div>
         )}
         <InlineEditableText
@@ -271,8 +271,8 @@ const AppGrid: React.FC<{
               <>
 
 
-                {/* Top half background - slightly lighter */}
-                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg" style={{ zIndex: 0, backgroundColor: 'rgba(255, 255, 255, 0.02)' }} />
+                {/* Top half background - darker in light mode, lighter in dark mode */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-black/[0.02] dark:bg-white/[0.02]" style={{ zIndex: 0 }} />
 
                 {/* Hover overlay that covers entire card */}
                 <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
@@ -317,16 +317,16 @@ const AppGrid: React.FC<{
                 </button>
                 
                 {/* Icon and text grouped and centered on dividing line */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3" style={{ zIndex: 2 }}>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
                   {app.icon && app.icon !== 'loading' ? (
                     <img
                       src={app.icon}
                       alt={app.name}
-                      className="app-icon w-24 h-24"
+                      className="app-icon w-[88px] h-[88px]"
                     />
                   ) : (
-                    <div className="w-24 h-24 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Play className="w-10 h-10 text-iconDefault" />
+                    <div className="w-[88px] h-[88px] bg-surfaceHover rounded-lg flex items-center justify-center">
+                      <Play className="w-9 h-9 text-iconDefault" />
                     </div>
                   )}
                   <InlineEditableText
@@ -358,7 +358,7 @@ const AppGrid: React.FC<{
                     onSave={(newName) => onSaveRename(app.path, newName)}
                     onCancel={onCancelRename}
                     isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
-                    className="text-sm text-textPrimary"
+                    className="text-sm text-textPrimary font-medium"
                     placeholder="Enter app name"
                   />
                 </div>

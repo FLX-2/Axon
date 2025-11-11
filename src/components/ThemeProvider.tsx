@@ -27,9 +27,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       activeColors = colors.light; // Default fallback
     }
     
-    // Apply each color as a CSS variable
-    Object.entries(activeColors).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(`--color-${key}`, value as string);
+    // Apply each color as a CSS variable (flatten nested structure)
+    const flattenColors = (obj: any, prefix = ''): Record<string, string> => {
+      return Object.entries(obj).reduce((acc, [key, value]) => {
+        const newKey = prefix ? `${prefix}-${key}` : key;
+        if (typeof value === 'object' && value !== null) {
+          return { ...acc, ...flattenColors(value, newKey) };
+        }
+        return { ...acc, [newKey]: value as string };
+      }, {});
+    };
+
+    const flatColors = flattenColors(activeColors);
+    Object.entries(flatColors).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(`--color-${key}`, value);
     });
     
     // Toggle dark mode class (for both dark and black themes)

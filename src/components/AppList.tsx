@@ -79,7 +79,7 @@ const RecentAppsExpandable: React.FC<{
         }}
         title={app.isPinned ? "Unpin" : "Pin"}
       >
-        <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconSecondary'}`} />
+        <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
       </button>
 
       <div className="flex-1 flex flex-col items-center justify-center w-full">
@@ -91,7 +91,7 @@ const RecentAppsExpandable: React.FC<{
           />
         ) : (
           <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
-            <Play className="w-8 h-8 text-iconSecondary" />
+            <Play className="w-8 h-8 text-iconDefault" />
           </div>
         )}
         <InlineEditableText
@@ -253,7 +253,7 @@ const AppGrid: React.FC<{
                   }}
                   title={app.isPinned ? "Unpin" : "Pin"}
                 >
-                  <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconSecondary'}`} />
+                  <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
                 </button>
                 
                 <div className="flex-1 flex flex-col items-center justify-center w-full">
@@ -265,7 +265,7 @@ const AppGrid: React.FC<{
                     />
                   ) : (
                     <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Play className="w-8 h-8 text-iconSecondary" />
+                      <Play className="w-8 h-8 text-iconDefault" />
                     </div>
                   )}
                   <InlineEditableText
@@ -289,7 +289,7 @@ const AppGrid: React.FC<{
                     />
                   ) : (
                     <div className="w-8 h-8 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Play className="w-4 h-4 text-iconSecondary" />
+                      <Play className="w-4 h-4 text-iconDefault" />
                     </div>
                   )}
                   <InlineEditableText
@@ -315,7 +315,7 @@ const AppGrid: React.FC<{
                   }}
                   title={app.isPinned ? "Unpin" : "Pin"}
                 >
-                  <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconSecondary'}`} />
+                  <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
                 </button>
               </div>
             )}

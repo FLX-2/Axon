@@ -41,7 +41,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
   return (
     <div className="p-3 border-b border-border bg-surfaceSecondary flex items-center gap-4 relative z-10">
       <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-iconSecondary w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-iconDefault w-4 h-4" />
         <input
           type="text"
           value={searchTerm}
@@ -53,7 +53,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-iconSecondary hover:text-textPrimary"
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-iconDefault hover:text-textPrimary"
           >
             <X className="w-5 h-5" />
           </button>
@@ -66,9 +66,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
           title={isGridView ? "Switch to list view" : "Switch to grid view"}
         >
           {isGridView ? (
-            <List className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <List className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           ) : (
-            <LayoutGrid className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <LayoutGrid className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           )}
         </button>
         <div className="w-px h-5 bg-border mx-1"></div>
@@ -78,9 +78,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ selectedCategory }) => {
           title={selectedCategory === 'Folders' ? "Add folder" : "Add custom app"}
         >
           {selectedCategory === 'Folders' ? (
-            <FolderPlus className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <FolderPlus className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           ) : (
-            <Plus className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <Plus className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           )}
         </button>
       </div>

@@ -26,19 +26,19 @@ export const Titlebar: React.FC = () => {
           }}
           className="h-8 w-12 flex items-center justify-center hover:bg-buttonHover"
         >
-          <Minus className="w-3.5 h-3.5 text-iconSecondary" />
+          <Minus className="w-3.5 h-3.5 text-iconDefault" />
         </button>
         <button
           onClick={() => appWindow.toggleMaximize()}
           className="h-8 w-12 flex items-center justify-center hover:bg-buttonHover"
         >
-          <Square className="w-3.5 h-3.5 text-iconSecondary" />
+          <Square className="w-3.5 h-3.5 text-iconDefault" />
         </button>
         <button
           onClick={() => appWindow.close()}
           className="h-8 w-12 flex items-center justify-center hover:bg-buttonHover"
         >
-          <X className="w-3.5 h-3.5 text-iconSecondary" />
+          <X className="w-3.5 h-3.5 text-iconDefault" />
         </button>
       </div>
     </div>

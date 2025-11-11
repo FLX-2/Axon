@@ -167,12 +167,12 @@ export const HotkeyInput: React.FC<HotkeyInputProps> = ({
             disabled={disabled}
           />
           
-          <Keyboard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-iconSecondary" />
+          <Keyboard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-iconDefault" />
           
           {value && !isRecording && (
             <button
               onClick={clearHotkey}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-iconSecondary hover:text-textPrimary transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-iconDefault hover:text-textPrimary transition-colors"
               title="Clear hotkey"
             >
               <X className="w-4 h-4" />

@@ -75,7 +75,7 @@ textarea,
 
 /* Black theme accent color fix */
 .theme-black .text-accent {
-  color: var(--color-accent);
+  color: var(--color-interactive-accent);
 }
 
 /* Remove hover glows only in black theme */

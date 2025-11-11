@@ -5,32 +5,45 @@ import { getSystemAccentColor } from '../lib/system';
 export type ThemeMode = 'light' | 'dark' | 'black' | 'system';
 
 interface ThemeColors {
-  // Backgrounds
-  surfacePrimary: string;
-  surfaceSecondary: string;
-  surfaceHover: string;
+  // Surfaces (backgrounds)
+  surface: {
+    primary: string;      // Main background
+    secondary: string;    // Cards, sidebar, topbar
+    hover: string;        // Hover state for interactive elements
+  };
 
-  // Text & Icons - Sidebar
-  sidebarText: string;
-  sidebarIcon: string;
-  sidebarIconHover: string;
+  // Text
+  text: {
+    primary: string;      // Main text
+    secondary: string;    // Secondary/muted text
+    placeholder: string;  // Input placeholders
+  };
 
-  // Text & Icons - Main Content
-  textPrimary: string;
-  textSecondary: string;
-  textPlaceholder: string;
-  iconPrimary: string;
-  iconSecondary: string;
+  // Icons
+  icon: {
+    default: string;      // Default icon color
+    hover: string;        // Icon hover state
+  };
 
-  // UI Elements
-  accent: string;
-  scrollbar: string;
-  scrollbarHover: string;
-  border: string;
-  buttonHover: string;
-  buttonSelected: string;
-  inputBg: string;
-  inputBorder: string;
+  // Interactive elements
+  interactive: {
+    accent: string;           // Accent color (selected states)
+    border: string;           // Borders and dividers
+    buttonHover: string;      // Button hover background
+    buttonSelected: string;   // Selected button background
+  };
+
+  // Inputs
+  input: {
+    background: string;   // Input background
+    border: string;       // Input border
+  };
+
+  // Scrollbar
+  scrollbar: {
+    track: string;        // Scrollbar track
+    thumb: string;        // Scrollbar thumb hover
+  };
 }
 
 interface SettingsState {
@@ -60,88 +73,94 @@ interface SettingsState {
 
 const defaultColors = {
   light: {
-    // Backgrounds - Keep your original colors
-    surfacePrimary: '#fcfafd',
-    surfaceSecondary: '#f3f2f2',
-    surfaceHover: '#eeeeee',        // Darker hover (you liked this)
-
-    // Text & Icons - Sidebar
-    sidebarText: '#111827',
-    sidebarIcon: '#737272',
-    sidebarIconHover: '#5b5a5a',
-
-    // Text & Icons - Main Content
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    textPlaceholder: '#9ca3af',
-    iconPrimary: '#737272',
-    iconSecondary: '#737272',
-
-    // UI Elements
-    accent: '#007acc',
-    scrollbar: '#e5e7eb',
-    scrollbarHover: '#d1d5db',
-    buttonSelected: '#d4d2d2',
-    border: '#d4d2d2',
-    buttonHover: '#e3e1e1',
-    inputBg: '#ffffff',
-    inputBorder: '#e5e7eb',
+    surface: {
+      primary: '#fcfafd',
+      secondary: '#f3f2f2',
+      hover: '#eeeeee',
+    },
+    text: {
+      primary: '#111827',
+      secondary: '#6b7280',
+      placeholder: '#9ca3af',
+    },
+    icon: {
+      default: '#737272',
+      hover: '#5b5a5a',
+    },
+    interactive: {
+      accent: '#007acc',
+      border: '#d4d2d2',
+      buttonHover: '#e3e1e1',
+      buttonSelected: '#d4d2d2',
+    },
+    input: {
+      background: '#ffffff',
+      border: '#e5e7eb',
+    },
+    scrollbar: {
+      track: '#e5e7eb',
+      thumb: '#d1d5db',
+    },
   },
   dark: {
-    // Backgrounds
-    surfacePrimary: '#272626',
-    surfaceSecondary: '#202121',
-    surfaceHover: '#323232',
-
-    // Text & Icons - Sidebar
-    sidebarText: '#fefffe',
-    sidebarIcon: '#9b9b9a',
-    sidebarIconHover: '#fefffe',
-
-    // Text & Icons - Main Content
-    textPrimary: '#fefffe',
-    textSecondary: '#9b9b9a',
-    textPlaceholder: '#9b9b9a',
-    iconPrimary: '#fefffe',
-    iconSecondary: '#9b9b9a',
-
-    // UI Elements
-    accent: '#ffffff',
-    scrollbar: '#404040',
-    scrollbarHover: '#525252',
-    buttonSelected: '#454545',
-    border: '#2c2d2c',
-    buttonHover: '#2c2d2c',
-    inputBg: '#323232',
-    inputBorder: '#2c2d2c',
+    surface: {
+      primary: '#272626',
+      secondary: '#202121',
+      hover: '#323232',
+    },
+    text: {
+      primary: '#fefffe',
+      secondary: '#9b9b9a',
+      placeholder: '#9b9b9a',
+    },
+    icon: {
+      default: '#9b9b9a',
+      hover: '#fefffe',
+    },
+    interactive: {
+      accent: '#007acc', // Will be replaced with system/custom accent on init
+      border: '#2c2d2c',
+      buttonHover: '#2c2d2c',
+      buttonSelected: '#454545',
+    },
+    input: {
+      background: '#323232',
+      border: '#2c2d2c',
+    },
+    scrollbar: {
+      track: '#404040',
+      thumb: '#525252',
+    },
   },
   black: {
-    // Backgrounds - Pure black with very subtle differences
-    surfacePrimary: '#000000',
-    surfaceSecondary: '#0a0a0a',
-    surfaceHover: '#141414',
-
-    // Text & Icons - Sidebar
-    sidebarText: '#ffffff',
-    sidebarIcon: '#8a8a8a',
-    sidebarIconHover: '#ffffff',
-
-    // Text & Icons - Main Content
-    textPrimary: '#ffffff',
-    textSecondary: '#8a8a8a',
-    textPlaceholder: '#666666',
-    iconPrimary: '#ffffff',
-    iconSecondary: '#8a8a8a',
-
-    // UI Elements
-    accent: '#ffffff',
-    scrollbar: '#1a1a1a',
-    scrollbarHover: '#333333',
-    buttonSelected: '#222222',
-    border: '#1a1a1a',
-    buttonHover: '#1a1a1a',
-    inputBg: '#141414',
-    inputBorder: '#1a1a1a',
+    surface: {
+      primary: '#000000',
+      secondary: '#0a0a0a',
+      hover: '#141414',
+    },
+    text: {
+      primary: '#ffffff',
+      secondary: '#8a8a8a',
+      placeholder: '#666666',
+    },
+    icon: {
+      default: '#8a8a8a',
+      hover: '#ffffff',
+    },
+    interactive: {
+      accent: '#007acc', // Will be replaced with system/custom accent on init
+      border: '#1a1a1a',
+      buttonHover: '#1a1a1a',
+      buttonSelected: '#222222',
+    },
+    input: {
+      background: '#141414',
+      border: '#1a1a1a',
+    },
+    scrollbar: {
+      track: '#1a1a1a',
+      thumb: '#333333',
+    },
   },
 };
 
@@ -173,9 +192,9 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
     // Update UI state immediately
     set({
       colors: {
-        light: { ...get().colors.light, accent: color },
-        dark: { ...get().colors.dark, accent: color },
-        black: { ...get().colors.black, accent: color },
+        light: { ...get().colors.light, interactive: { ...get().colors.light.interactive, accent: color } },
+        dark: { ...get().colors.dark, interactive: { ...get().colors.dark.interactive, accent: color } },
+        black: { ...get().colors.black, interactive: { ...get().colors.black.interactive, accent: color } },
       },
       isCustomAccentColor: true
     });
@@ -200,9 +219,9 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
       // Update UI state
       set({
         colors: {
-          light: { ...get().colors.light, accent: accentColor },
-          dark: { ...get().colors.dark, accent: accentColor },
-          black: { ...get().colors.black, accent: accentColor },
+          light: { ...get().colors.light, interactive: { ...get().colors.light.interactive, accent: accentColor } },
+          dark: { ...get().colors.dark, interactive: { ...get().colors.dark.interactive, accent: accentColor } },
+          black: { ...get().colors.black, interactive: { ...get().colors.black.interactive, accent: accentColor } },
         },
         isCustomAccentColor: false
       });
@@ -222,9 +241,9 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
       const fallbackColor = '#007acc';
       set({
         colors: {
-          light: { ...get().colors.light, accent: fallbackColor },
-          dark: { ...get().colors.dark, accent: fallbackColor },
-          black: { ...get().colors.black, accent: fallbackColor },
+          light: { ...get().colors.light, interactive: { ...get().colors.light.interactive, accent: fallbackColor } },
+          dark: { ...get().colors.dark, interactive: { ...get().colors.dark.interactive, accent: fallbackColor } },
+          black: { ...get().colors.black, interactive: { ...get().colors.black.interactive, accent: fallbackColor } },
         },
         isCustomAccentColor: false
       });
@@ -353,15 +372,15 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
         colors: {
           light: {
             ...defaultColors.light,
-            accent: accentColor
+            interactive: { ...defaultColors.light.interactive, accent: accentColor }
           },
           dark: {
             ...defaultColors.dark,
-            accent: accentColor
+            interactive: { ...defaultColors.dark.interactive, accent: accentColor }
           },
           black: {
             ...defaultColors.black,
-            accent: accentColor
+            interactive: { ...defaultColors.black.interactive, accent: accentColor }
           }
         }
       });
@@ -372,9 +391,9 @@ export const useUnifiedSettingsStore = create<SettingsState>((set, get) => ({
         const systemAccent = await getSystemAccentColor() as string;
         set({
           colors: {
-            light: { ...defaultColors.light, accent: systemAccent },
-            dark: { ...defaultColors.dark, accent: systemAccent },
-            black: { ...defaultColors.black, accent: systemAccent }
+            light: { ...defaultColors.light, interactive: { ...defaultColors.light.interactive, accent: systemAccent } },
+            dark: { ...defaultColors.dark, interactive: { ...defaultColors.dark.interactive, accent: systemAccent } },
+            black: { ...defaultColors.black, interactive: { ...defaultColors.black.interactive, accent: systemAccent } }
           }
         });
       } catch (fallbackError) {

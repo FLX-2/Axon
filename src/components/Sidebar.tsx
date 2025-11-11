@@ -40,9 +40,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {isExpanded ? (
-            <PanelLeft className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <PanelLeft className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           ) : (
-            <PanelLeftOpen className="w-5 h-5 text-sidebarIcon group-hover:text-sidebarIconHover transition-colors" />
+            <PanelLeftOpen className="w-5 h-5 text-iconDefault group-hover:text-iconHover transition-colors" />
           )}
         </button>
       </div>
@@ -69,9 +69,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Icon className={`w-6 h-9 flex-shrink-0 transition-colors ${
                 selectedCategory === id
                   ? 'text-accent'
-                  : 'text-sidebarIcon group-hover:text-sidebarIconHover'
+                  : 'text-iconDefault group-hover:text-iconHover'
               }`} />
-              {isExpanded && <span className="text-sm text-sidebarText">{name}</span>}
+              {isExpanded && <span className="text-sm text-textPrimary">{name}</span>}
             </button>
           ))}
         </div>
@@ -98,9 +98,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Icon className={`w-6 h-9 flex-shrink-0 transition-colors ${
               selectedCategory === id
                 ? 'text-accent'
-                : 'text-sidebarIcon group-hover:text-sidebarIconHover'
+                : 'text-iconDefault group-hover:text-iconHover'
             }`} />
-            {isExpanded && <span className="text-sm text-sidebarText">{name}</span>}
+            {isExpanded && <span className="text-sm text-textPrimary">{name}</span>}
           </button>
         ))}
       </div>

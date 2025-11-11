@@ -10,8 +10,8 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = () => {
   
   // Get the accent color from the settings store
   const { colors, themeMode } = useUnifiedSettingsStore();
-  const activeColors = themeMode === 'dark' || themeMode === 'black' ? colors.dark : colors.light;
-  const accentColor = activeColors.accent;
+  const activeColors = themeMode === 'black' ? colors.black : (themeMode === 'dark' ? colors.dark : colors.light);
+  const accentColor = activeColors.interactive.accent;
 
   // Get the actual loading state and icon progress
   const { isLoading, iconLoadingProgress } = useUnifiedAppStore();

@@ -12,30 +12,33 @@ export default {
         'card': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
       },
       colors: {
-        // Backgrounds
-        surfacePrimary: 'var(--color-surfacePrimary)',
-        surfaceSecondary: 'var(--color-surfaceSecondary)',
-        surfaceHover: 'var(--color-surfaceHover)',
+        // Surfaces
+        surfacePrimary: 'var(--color-surface-primary)',
+        surfaceSecondary: 'var(--color-surface-secondary)',
+        surfaceHover: 'var(--color-surface-hover)',
         
-        // Text & Icons - Sidebar
-        sidebarText: 'var(--color-sidebarText)',
-        sidebarIcon: 'var(--color-sidebarIcon)',
-        sidebarIconHover: 'var(--color-sidebarIconHover)',
+        // Text
+        textPrimary: 'var(--color-text-primary)',
+        textSecondary: 'var(--color-text-secondary)',
+        textPlaceholder: 'var(--color-text-placeholder)',
         
-        // Text & Icons - Main Content
-        textPrimary: 'var(--color-textPrimary)',
-        textSecondary: 'var(--color-textSecondary)',
-        textPlaceholder: 'var(--color-textPlaceholder)',
-        iconPrimary: 'var(--color-iconPrimary)',
-        iconSecondary: 'var(--color-iconSecondary)',
+        // Icons
+        iconDefault: 'var(--color-icon-default)',
+        iconHover: 'var(--color-icon-hover)',
         
-        // UI Elements
-        accent: 'var(--color-accent)',
-        border: 'var(--color-border)',
-        buttonHover: 'var(--color-buttonHover)',
-        inputBg: 'var(--color-inputBg)',
-        inputBorder: 'var(--color-inputBorder)',
-        buttonSelected: 'var(--color-buttonSelected)',
+        // Interactive
+        accent: 'var(--color-interactive-accent)',
+        border: 'var(--color-interactive-border)',
+        buttonHover: 'var(--color-interactive-buttonHover)',
+        buttonSelected: 'var(--color-interactive-buttonSelected)',
+        
+        // Input
+        inputBg: 'var(--color-input-background)',
+        inputBorder: 'var(--color-input-border)',
+        
+        // Scrollbar
+        scrollbar: 'var(--color-scrollbar-track)',
+        scrollbarHover: 'var(--color-scrollbar-thumb)',
       },
     },
   },

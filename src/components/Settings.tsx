@@ -110,7 +110,17 @@ export const Settings: React.FC = () => {
     isCustomAccentColor,
   } = settings;
 
-  const activeColors = themeMode === 'dark' ? colors.dark : colors.light;
+  // Determine the actual active theme (handle 'system' mode)
+  const getActiveTheme = () => {
+    if (themeMode === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return prefersDark ? 'dark' : 'light';
+    }
+    return themeMode;
+  };
+  
+  const actualTheme = getActiveTheme();
+  const activeColors = actualTheme === 'black' ? colors.black : (actualTheme === 'dark' ? colors.dark : colors.light);
 
   return (
     <div className={SPACING.container}>
@@ -165,13 +175,13 @@ export const Settings: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div
                   className={`${HEIGHTS.colorPreview} rounded-lg border border-surfaceSecondary`}
-                  style={{ backgroundColor: activeColors.accent }}
+                  style={{ backgroundColor: activeColors.interactive.accent }}
                 />
                 <div className="flex items-center gap-2">
                   <label className="relative">
                     <input
                       type="color"
-                      value={activeColors.accent}
+                      value={activeColors.interactive.accent}
                       onChange={(e) => setAccentColor(e.target.value)}
                       className="sr-only"
                     />

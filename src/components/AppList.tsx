@@ -66,21 +66,20 @@ const RecentAppsExpandable: React.FC<{
     >
 
 
-      {/* Top 40% background with gradient mask - matches input background color */}
+      {/* Top 40% background - matches input background color */}
       <div 
         className="absolute top-0 left-0 right-0 rounded-t-lg bg-inputBg" 
         style={{ 
           height: '40%',
           zIndex: 0,
-          maskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
+          opacity: 0.8,
         }} 
       />
 
       {/* Hover overlay that covers entire card */}
       <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
 
-      {/* Blurred background layer with gradient mask - 40% height */}
+      {/* Blurred background layer - 40% height */}
       {app.icon && app.icon !== 'loading' && (
         <div 
           className="absolute top-0 left-0 right-0 overflow-hidden rounded-t-lg"
@@ -98,8 +97,6 @@ const RecentAppsExpandable: React.FC<{
               filter: 'blur(40px)',
               opacity: 0.1,
               transform: 'scale(1.2)',
-              maskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
             }}
           />
         </div>
@@ -288,21 +285,20 @@ const AppGrid: React.FC<{
               <>
 
 
-                {/* Top 40% background with gradient mask - matches input background color */}
+                {/* Top 40% background - matches input background color */}
                 <div 
                   className="absolute top-0 left-0 right-0 rounded-t-lg bg-inputBg" 
                   style={{ 
                     height: '40%',
                     zIndex: 0,
-                    maskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
-                    WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                    opacity: 0.8,
                   }} 
                 />
 
                 {/* Hover overlay that covers entire card */}
                 <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
 
-                {/* Blurred background layer with gradient mask - 40% height */}
+                {/* Blurred background layer - 40% height */}
                 {app.icon && app.icon !== 'loading' && (
                   <div 
                     className="absolute top-0 left-0 right-0 overflow-hidden rounded-t-lg"
@@ -320,8 +316,6 @@ const AppGrid: React.FC<{
                         filter: 'blur(40px)',
                         opacity: 0.1,
                         transform: 'scale(1.2)',
-                        maskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
-                        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
                       }}
                     />
                   </div>

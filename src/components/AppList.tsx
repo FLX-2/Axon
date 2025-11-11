@@ -66,17 +66,28 @@ const RecentAppsExpandable: React.FC<{
     >
 
 
-      {/* Top half background - matches input background color */}
-      <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-inputBg" style={{ zIndex: 0 }} />
+      {/* Top 40% background with gradient mask - matches input background color */}
+      <div 
+        className="absolute top-0 left-0 right-0 rounded-t-lg bg-inputBg" 
+        style={{ 
+          height: '40%',
+          zIndex: 0,
+          maskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
+        }} 
+      />
 
       {/* Hover overlay that covers entire card */}
       <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
 
-      {/* Blurred background layer */}
+      {/* Blurred background layer with gradient mask - 40% height */}
       {app.icon && app.icon !== 'loading' && (
         <div 
-          className="absolute top-0 left-0 right-0 h-1/2 overflow-hidden rounded-t-lg"
-          style={{ zIndex: 2 }}
+          className="absolute top-0 left-0 right-0 overflow-hidden rounded-t-lg"
+          style={{ 
+            height: '40%',
+            zIndex: 2 
+          }}
         >
           <div
             className="absolute inset-0"
@@ -87,6 +98,8 @@ const RecentAppsExpandable: React.FC<{
               filter: 'blur(40px)',
               opacity: 0.1,
               transform: 'scale(1.2)',
+              maskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 85%, transparent 100%)',
             }}
           />
         </div>
@@ -111,8 +124,8 @@ const RecentAppsExpandable: React.FC<{
         <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
       </button>
 
-      {/* Icon and text grouped and centered on dividing line */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
+      {/* Icon centered on the 40/60 dividing line */}
+      <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center" style={{ zIndex: 4 }}>
         {app.icon && app.icon !== 'loading' ? (
           <img
             src={app.icon}
@@ -124,12 +137,16 @@ const RecentAppsExpandable: React.FC<{
             <Play className="w-9 h-9 text-iconDefault" />
           </div>
         )}
+      </div>
+
+      {/* Text in the bottom area */}
+      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-4 px-3" style={{ zIndex: 2, top: 'calc(40% + 50px)' }}>
         <InlineEditableText
           value={app.name}
           onSave={(newName) => onSaveRename(app.path, newName)}
           onCancel={onCancelRename}
           isEditing={editingAppKey === `recent-${apps.indexOf(app)}-${app.path}`}
-          className="text-sm text-textPrimary text-center w-full font-medium px-3"
+          className="text-sm text-textPrimary text-center w-full font-medium"
           placeholder="Enter app name"
         />
       </div>
@@ -271,18 +288,28 @@ const AppGrid: React.FC<{
               <>
 
 
-                {/* Top half background - darker in all modes */}
-                {/* Top half background - matches input background color */}
-                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-inputBg" style={{ zIndex: 0 }} />
+                {/* Top 40% background with gradient mask - matches input background color */}
+                <div 
+                  className="absolute top-0 left-0 right-0 rounded-t-lg bg-inputBg" 
+                  style={{ 
+                    height: '40%',
+                    zIndex: 0,
+                    maskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                  }} 
+                />
 
                 {/* Hover overlay that covers entire card */}
                 <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
 
-                {/* Blurred background layer */}
+                {/* Blurred background layer with gradient mask - 40% height */}
                 {app.icon && app.icon !== 'loading' && (
                   <div 
-                    className="absolute top-0 left-0 right-0 h-1/2 overflow-hidden rounded-t-lg"
-                    style={{ zIndex: 2 }}
+                    className="absolute top-0 left-0 right-0 overflow-hidden rounded-t-lg"
+                    style={{ 
+                      height: '40%',
+                      zIndex: 2 
+                    }}
                   >
                     <div
                       className="absolute inset-0"
@@ -293,6 +320,8 @@ const AppGrid: React.FC<{
                         filter: 'blur(40px)',
                         opacity: 0.1,
                         transform: 'scale(1.2)',
+                        maskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 70%, transparent 100%)',
                       }}
                     />
                   </div>
@@ -317,8 +346,8 @@ const AppGrid: React.FC<{
                   <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
                 </button>
                 
-                {/* Icon and text grouped and centered on dividing line */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
+                {/* Icon centered on the 40/60 dividing line */}
+                <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center" style={{ zIndex: 4 }}>
                   {app.icon && app.icon !== 'loading' ? (
                     <img
                       src={app.icon}
@@ -330,12 +359,16 @@ const AppGrid: React.FC<{
                       <Play className="w-9 h-9 text-iconDefault" />
                     </div>
                   )}
+                </div>
+
+                {/* Text in the bottom area */}
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-4 px-3" style={{ zIndex: 2, top: 'calc(40% + 50px)' }}>
                   <InlineEditableText
                     value={app.name}
                     onSave={(newName) => onSaveRename(app.path, newName)}
                     onCancel={onCancelRename}
                     isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
-                    className="text-sm text-textPrimary text-center w-full font-medium px-3"
+                    className="text-sm text-textPrimary text-center w-full font-medium"
                     placeholder="Enter app name"
                   />
                 </div>

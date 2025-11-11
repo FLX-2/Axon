@@ -62,8 +62,36 @@ const RecentAppsExpandable: React.FC<{
     <div
       onContextMenu={(e) => handleContextMenu(e, app)}
       onClick={() => onLaunch(app.path)}
-      className="flex flex-col items-center p-4 aspect-[3/4] bg-surfaceSecondary hover:bg-surfaceHover group transition-colors rounded-lg relative border border-border dark:border-transparent"
+      className="flex flex-col items-center p-4 aspect-[3/4] bg-surfaceSecondary group transition-colors rounded-lg relative border border-border dark:border-transparent overflow-hidden"
     >
+
+
+      {/* Top half background - slightly lighter */}
+      <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg" style={{ zIndex: 0, backgroundColor: 'rgba(255, 255, 255, 0.02)' }} />
+
+      {/* Hover overlay that covers entire card */}
+      <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
+
+      {/* Blurred background layer */}
+      {app.icon && app.icon !== 'loading' && (
+        <div 
+          className="absolute top-0 left-0 right-0 h-1/2 overflow-hidden rounded-t-lg"
+          style={{ zIndex: 2 }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${app.icon})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(40px)',
+              opacity: 0.05,
+              transform: 'scale(1.2)',
+            }}
+          />
+        </div>
+      )}
+
       <button
         className={`
           absolute top-2 right-2
@@ -73,6 +101,7 @@ const RecentAppsExpandable: React.FC<{
             : 'opacity-0 group-hover:opacity-100'
           }
         `}
+        style={{ zIndex: 10 }}
         onClick={(e) => {
           e.stopPropagation();
           onPin(app.path);
@@ -82,16 +111,17 @@ const RecentAppsExpandable: React.FC<{
         <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
       </button>
 
-      <div className="flex-1 flex flex-col items-center justify-center w-full">
+      {/* Icon and text grouped and centered on dividing line */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3" style={{ zIndex: 2 }}>
         {app.icon && app.icon !== 'loading' ? (
           <img
             src={app.icon}
             alt={app.name}
-            className="app-icon w-20 h-20 mb-4"
+            className="app-icon w-24 h-24"
           />
         ) : (
-          <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
-            <Play className="w-8 h-8 text-iconDefault" />
+          <div className="w-24 h-24 bg-surfaceHover rounded-lg flex items-center justify-center">
+            <Play className="w-10 h-10 text-iconDefault" />
           </div>
         )}
         <InlineEditableText
@@ -99,7 +129,7 @@ const RecentAppsExpandable: React.FC<{
           onSave={(newName) => onSaveRename(app.path, newName)}
           onCancel={onCancelRename}
           isEditing={editingAppKey === `recent-${apps.indexOf(app)}-${app.path}`}
-          className="text-sm text-textPrimary text-center w-full"
+          className="text-sm text-textPrimary text-center w-full font-medium px-3"
           placeholder="Enter app name"
         />
       </div>
@@ -226,10 +256,11 @@ const AppGrid: React.FC<{
             onClick={() => onLaunch(app.path)}
             className={`
               ${isGridView
-                ? 'flex flex-col items-center p-4 aspect-[3/4]'
+                ? 'flex flex-col items-center p-4 aspect-[3/4] overflow-hidden'
                 : 'flex items-center w-full px-4 py-4'
               }
-              bg-surfaceSecondary hover:bg-surfaceHover
+              bg-surfaceSecondary
+              ${!isGridView ? 'hover:bg-surfaceHover' : ''}
               group
               transition-colors rounded-lg
               relative
@@ -238,6 +269,34 @@ const AppGrid: React.FC<{
           >
             {isGridView ? (
               <>
+
+
+                {/* Top half background - slightly lighter */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg" style={{ zIndex: 0, backgroundColor: 'rgba(255, 255, 255, 0.02)' }} />
+
+                {/* Hover overlay that covers entire card */}
+                <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
+
+                {/* Blurred background layer */}
+                {app.icon && app.icon !== 'loading' && (
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1/2 overflow-hidden rounded-t-lg"
+                    style={{ zIndex: 2 }}
+                  >
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        backgroundImage: `url(${app.icon})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: 'blur(40px)',
+                        opacity: 0.05,
+                        transform: 'scale(1.2)',
+                      }}
+                    />
+                  </div>
+                )}
+
                 <button
                   className={`
                     absolute top-2 right-2
@@ -247,6 +306,7 @@ const AppGrid: React.FC<{
                       : 'opacity-0 group-hover:opacity-100'
                     }
                   `}
+                  style={{ zIndex: 10 }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onPin(app.path);
@@ -256,16 +316,17 @@ const AppGrid: React.FC<{
                   <Pin className={`w-4 h-4 ${app.isPinned ? 'text-accent' : 'text-iconDefault'}`} />
                 </button>
                 
-                <div className="flex-1 flex flex-col items-center justify-center w-full">
+                {/* Icon and text grouped and centered on dividing line */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3" style={{ zIndex: 2 }}>
                   {app.icon && app.icon !== 'loading' ? (
                     <img
                       src={app.icon}
                       alt={app.name}
-                      className="app-icon w-20 h-20 mb-4"
+                      className="app-icon w-24 h-24"
                     />
                   ) : (
-                    <div className="w-20 h-20 mb-4 bg-surfaceHover rounded-lg flex items-center justify-center">
-                      <Play className="w-8 h-8 text-iconDefault" />
+                    <div className="w-24 h-24 bg-surfaceHover rounded-lg flex items-center justify-center">
+                      <Play className="w-10 h-10 text-iconDefault" />
                     </div>
                   )}
                   <InlineEditableText
@@ -273,7 +334,7 @@ const AppGrid: React.FC<{
                     onSave={(newName) => onSaveRename(app.path, newName)}
                     onCancel={onCancelRename}
                     isEditing={editingAppKey === `all-${apps.indexOf(app)}-${app.path}`}
-                    className="text-sm text-textPrimary text-center w-full"
+                    className="text-sm text-textPrimary text-center w-full font-medium px-3"
                     placeholder="Enter app name"
                   />
                 </div>

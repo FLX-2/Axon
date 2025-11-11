@@ -81,6 +81,7 @@ export const Folders: React.FC = () => {
           <div
             key={folder.path}
             onContextMenu={(e) => handleContextMenu(e, folder)}
+            onClick={() => handleOpenFolder(folder.path)}
             className={`
               ${isGridView
                 ? 'flex flex-col items-center p-4 aspect-[3/4] overflow-hidden'
@@ -124,22 +125,17 @@ export const Folders: React.FC = () => {
 
                 {/* Icon and text grouped and centered on dividing line */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6" style={{ zIndex: 2 }}>
-                  <button
-                    onClick={() => handleOpenFolder(folder.path)}
-                    className="flex flex-col items-center"
-                  >
-                    {folder.icon ? (
-                      <img 
-                        src={folder.icon} 
-                        alt={folder.name}
-                        className="w-[88px] h-[88px] app-icon"
-                      />
-                    ) : (
-                      <div className="w-[88px] h-[88px] bg-surfaceHover rounded-lg flex items-center justify-center">
-                        <Folder className="w-9 h-9 text-iconDefault" />
-                      </div>
-                    )}
-                  </button>
+                  {folder.icon ? (
+                    <img 
+                      src={folder.icon} 
+                      alt={folder.name}
+                      className="w-[88px] h-[88px] app-icon"
+                    />
+                  ) : (
+                    <div className="w-[88px] h-[88px] bg-surfaceHover rounded-lg flex items-center justify-center">
+                      <Folder className="w-9 h-9 text-iconDefault" />
+                    </div>
+                  )}
                   <InlineEditableText
                     value={folder.name}
                     onSave={(newName) => saveFolderRename(folder.path, newName)}
@@ -151,10 +147,7 @@ export const Folders: React.FC = () => {
                 </div>
               </>
             ) : (
-              <button
-                onClick={() => handleOpenFolder(folder.path)}
-                className="flex items-center space-x-3 flex-grow"
-              >
+              <div className="flex items-center space-x-3 flex-grow">
                 {folder.icon ? (
                   <img 
                     src={folder.icon} 
@@ -174,7 +167,7 @@ export const Folders: React.FC = () => {
                   className="text-sm text-textPrimary font-medium"
                   placeholder="Enter folder name"
                 />
-              </button>
+              </div>
             )}
           </div>
         ))}

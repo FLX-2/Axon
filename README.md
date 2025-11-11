@@ -66,7 +66,7 @@ This will generate an installer in `src-tauri/target/release/bundle/`.
 
 <!-- Add your screenshots here. -->
 <!-- Example: ![Application Screenshot](screenshots/screenshot.png) -->
-![Axon Screenshot](axonScreenshot.jpg)
+![Axon Screenshot](axonScreenshot2.png)
 
 ## 📄 License
 

@@ -97,8 +97,9 @@ export const Folders: React.FC = () => {
           >
             {isGridView ? (
               <>
-                {/* Top half background - darker in light mode, lighter in dark mode */}
-                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-black/[0.02] dark:bg-white/[0.02]" style={{ zIndex: 0 }} />
+                {/* Top half background - darker in all modes */}
+                {/* Top half background - matches input background color */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-lg bg-inputBg" style={{ zIndex: 0 }} />
 
                 {/* Hover overlay that covers entire card */}
                 <div className="absolute inset-0 bg-surfaceHover opacity-0 group-hover:opacity-30 transition-opacity rounded-lg" style={{ zIndex: 1 }} />
@@ -116,7 +117,7 @@ export const Folders: React.FC = () => {
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         filter: 'blur(40px)',
-                        opacity: 0.05,
+                        opacity: 0.1,
                         transform: 'scale(1.2)',
                       }}
                     />

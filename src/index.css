@@ -28,49 +28,16 @@ textarea,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-scrollbar);
+  background: var(--color-scrollbar-thumb);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-scrollbarHover);
+  background: var(--color-icon-hover);
   border: 2px solid transparent;
   background-clip: padding-box;
-}
-
-/* Dark mode scrollbar */
-.dark ::-webkit-scrollbar-thumb {
-  background: var(--color-scrollbar);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-scrollbarHover);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-/* Black theme scrollbar */
-.theme-black ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.theme-black ::-webkit-scrollbar-track {
-  background: var(--color-surfacePrimary);
-}
-
-.theme-black ::-webkit-scrollbar-thumb {
-  background: var(--color-scrollbar);
-  border-radius: 4px;
-  border: none;
-}
-
-.theme-black ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-scrollbarHover);
 }
 
 /* Black theme accent color fix */
